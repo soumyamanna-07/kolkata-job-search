@@ -129,8 +129,8 @@ def close_missing(conn: psycopg.Connection, results: list[CollectResult], run_st
     closed = 0
     warnings = []
     for r in results:
-        if not r.complete:
-            continue                                # never close on partial / failed data
+        if not r.complete or not r.snapshot:
+            continue                                # never close on partial, failed or "recent only" data
         open_now = conn.execute(COUNT_OPEN_SQL, (r.source, r.company_id)).fetchone()[0]
         if not r.jobs and open_now >= SUSPICIOUS_EMPTY_THRESHOLD:
             warnings.append(f"{r.scope}: returned 0 jobs but {open_now} are open - not closing (check source)")

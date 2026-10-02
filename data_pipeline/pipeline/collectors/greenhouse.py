@@ -22,6 +22,7 @@ def collect(session: requests.Session, token: str, company_name: str, company_id
     result = CollectResult(source="greenhouse", scope=f"greenhouse:{token}", company_id=company_id)
     try:
         resp = session.get(API_URL.format(token=token), params={"content": "true"}, timeout=TIMEOUT_SECONDS)
+        result.requests_made += 1
         resp.raise_for_status()
         data = resp.json()
         for item in data.get("jobs", []):

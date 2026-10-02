@@ -67,6 +67,11 @@ class TestLever(unittest.TestCase):
 
 
 class TestAdzuna(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(adzuna, "PAGE_DELAY", 0)   # no real waiting in tests
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def item(self, i, predicted="0"):
         return {"id": str(i), "title": f"Job {i}", "company": {"display_name": "Co"},
                 "location": {"display_name": "Kolkata, West Bengal", "area": ["India", "West Bengal", "Kolkata"]},
@@ -80,11 +85,26 @@ class TestAdzuna(unittest.TestCase):
             fake_response({"count": 3, "results": [self.item(1), self.item(2)]}),
             fake_response({"count": 3, "results": [self.item(3, predicted="1")]}),
         ]
-        r = adzuna.collect(session, "id", "key")
+        r = adzuna.collect(session, "id", "key", mode="full")
         self.assertTrue(r.complete)
+        self.assertTrue(r.snapshot)                # full mode may close missing jobs
+        self.assertEqual(r.requests_made, 2)
         self.assertEqual(len(r.jobs), 3)
         self.assertEqual(r.jobs[0].salary_min, 300000)
         self.assertIsNone(r.jobs[2].salary_min)   # predicted salary dropped
+
+    def test_recent_mode_only_new_jobs_and_never_closes(self):
+        session = mock.Mock()
+        session.get.return_value = fake_response({"count": 1, "results": [self.item(1)]})
+        r = adzuna.collect(session, "id", "key", mode="recent")
+        params = session.get.call_args.kwargs["params"]
+        self.assertEqual(params["max_days_old"], adzuna.RECENT_DAYS)
+        self.assertTrue(r.complete)
+        self.assertFalse(r.snapshot)
+
+    def test_unknown_mode(self):
+        with self.assertRaises(ValueError):
+            adzuna.collect(mock.Mock(), "id", "key", mode="everything")
 
     def test_missing_keys_skips(self):
         r = adzuna.collect(mock.Mock(), "", "")

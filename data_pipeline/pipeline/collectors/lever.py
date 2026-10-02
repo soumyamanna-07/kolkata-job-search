@@ -15,6 +15,7 @@ def collect(session: requests.Session, slug: str, company_name: str, company_id:
     result = CollectResult(source="lever", scope=f"lever:{slug}", company_id=company_id)
     try:
         resp = session.get(API_URL.format(slug=slug), params={"mode": "json"}, timeout=TIMEOUT_SECONDS)
+        result.requests_made += 1
         resp.raise_for_status()
         data = resp.json()
         if not isinstance(data, list):

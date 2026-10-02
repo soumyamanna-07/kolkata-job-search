@@ -123,6 +123,15 @@ class TestCleanJob(unittest.TestCase):
         self.assertEqual(job.work_mode, "hybrid")
         self.assertIn("python", job.skills)
 
+    def test_title_naming_other_city_rejected(self):
+        # source said Kolkata, but the title clearly says Kochi
+        self.assertIsNone(clean_job(raw(title="Operations Manager - Kochi")))
+        self.assertIsNone(clean_job(raw(title="Sales Executive (Bangalore)")))
+        # title mentions Kolkata too -> keep
+        self.assertIsNotNone(clean_job(raw(title="Account Manager - East (Kolkata / Pune)")))
+        # no city in title -> keep
+        self.assertIsNotNone(clean_job(raw(title="Priority Relationship Manager")))
+
     def test_rejects(self):
         self.assertIsNone(clean_job(raw(locations=["Mumbai"])))
         self.assertIsNone(clean_job(raw(apply_url="not-a-link")))

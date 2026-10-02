@@ -6,6 +6,7 @@ Run from the project root:
 
 Options:
     --sources lever,greenhouse,adzuna   only run these sources
+    --adzuna-mode recent|full           recent = new jobs only (daily), full = all jobs + closing (weekly)
     --trigger schedule|manual           recorded in pipeline_runs (GitHub Actions uses schedule)
 """
 import argparse
@@ -27,7 +28,7 @@ def log(message: str) -> None:
     print(message, flush=True)
 
 
-def collect_all(companies: list[dict], sources: set[str]) -> list[CollectResult]:
+def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "recent") -> list[CollectResult]:
     session = make_session()
     results = []
     for company in companies:
@@ -40,9 +41,10 @@ def collect_all(companies: list[dict], sources: set[str]) -> list[CollectResult]
         log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
         time.sleep(DELAY_BETWEEN_COMPANIES)
     if "adzuna" in sources:
-        r = adzuna.collect(session, config.ADZUNA_APP_ID, config.ADZUNA_APP_KEY)
+        r = adzuna.collect(session, config.ADZUNA_APP_ID, config.ADZUNA_APP_KEY, adzuna_mode)
         results.append(r)
-        log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'SKIPPED/FAILED: ' + (r.error or '')}")
+        log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'SKIPPED/FAILED: ' + (r.error or '')}"
+            f"  ({r.requests_made} API calls)")
     return results
 
 
@@ -51,7 +53,8 @@ def process(results: list[CollectResult]):
     cleaned = [c for c in (clean_job(j) for j in raw_jobs) if c is not None]
     unique = deduplicate(cleaned)
     source_stats = {
-        r.scope: {"ok": r.complete, "jobs": len(r.jobs), **({"error": r.error} if r.error else {})}
+        r.scope: {"ok": r.complete, "jobs": len(r.jobs), "requests": r.requests_made,
+                  **({"error": r.error} if r.error else {})}
         for r in results
     }
     stats = {"total_collected": len(raw_jobs), "kolkata_count": len(cleaned),
@@ -63,6 +66,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Kolkata job data pipeline")
     parser.add_argument("--dry-run", action="store_true", help="collect and clean only, write nothing")
     parser.add_argument("--sources", default=",".join(ALL_SOURCES))
+    parser.add_argument("--adzuna-mode", choices=adzuna.MODES, default="recent")
     parser.add_argument("--trigger", choices=("manual", "schedule"), default="manual")
     args = parser.parse_args()
     sources = {s.strip() for s in args.sources.split(",") if s.strip()}
@@ -83,7 +87,7 @@ def main() -> int:
 
         try:
             log("Collecting:")
-            results = collect_all(companies, sources)
+            results = collect_all(companies, sources, args.adzuna_mode)
             jobs, stats = process(results)
             log(f"Total collected: {stats['total_collected']} -> Kolkata: {stats['kolkata_count']} "
                 f"-> Unique: {stats['unique_count']}")
