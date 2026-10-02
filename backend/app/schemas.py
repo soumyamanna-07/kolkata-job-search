@@ -106,3 +106,24 @@ class CVUpdate(BaseModel):
     experience_years: Optional[float] = Field(default=None, ge=0, le=50)
     education: Optional[str] = Field(default=None, max_length=60)
     job_titles: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(default=[], max_length=10)
+
+
+class MatchedJob(JobSummary):
+    """A job ranked for a CV, with the reasons behind its score."""
+    match_score: int = Field(ge=0, le=100)
+    meaning_score: float             # 0..1, how close the AI thinks the job is to the CV
+    matched_skills: list[str] = []
+    missing_skills: list[str] = []
+    reasons: list[str] = []
+
+
+class SkillGapItem(BaseModel):
+    skill: str
+    jobs: int                        # how many of your best-matching jobs ask for it
+
+
+class MatchResponse(BaseModel):
+    cv: CVParsed
+    items: list[MatchedJob]
+    skill_gap: list[SkillGapItem]    # skills to learn next, most useful first
+    scoring_version: str

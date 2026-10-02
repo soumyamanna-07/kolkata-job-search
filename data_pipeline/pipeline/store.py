@@ -6,6 +6,7 @@ import psycopg
 
 from pipeline.collectors.base import CollectResult
 from pipeline.models import CleanJob
+from pipeline.normalize import MAX_JOB_AGE_DAYS
 
 # Higher number wins when two sources describe the same job (same job_key)
 PRIORITY_SQL = """case {col}
@@ -55,6 +56,17 @@ where status = 'open'
   and source = %s
   and company_id is not distinct from %s
   and last_seen_at < %s
+returning id
+"""
+
+# "Current jobs only": close anything posted (or first seen, if no date) more than
+# MAX_JOB_AGE_DAYS ago. Employer-posted jobs are managed by the employer, so they are skipped.
+EXPIRE_SQL = """
+update public.jobs
+set status = 'closed', closed_at = now()
+where status = 'open'
+  and source <> 'employer'
+  and coalesce(posted_at, first_seen_at) < now() - make_interval(days => %s)
 returning id
 """
 
@@ -137,3 +149,8 @@ def close_missing(conn: psycopg.Connection, results: list[CollectResult], run_st
             continue
         closed += len(conn.execute(CLOSE_SQL, (r.source, r.company_id, run_started_at)).fetchall())
     return closed, warnings
+
+
+def close_expired(conn: psycopg.Connection, max_age_days: int = MAX_JOB_AGE_DAYS) -> int:
+    """Close open jobs that are older than max_age_days. Returns how many were closed."""
+    return len(conn.execute(EXPIRE_SQL, (max_age_days,)).fetchall())

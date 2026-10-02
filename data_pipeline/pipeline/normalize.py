@@ -1,17 +1,21 @@
 """Turn a RawJob from any source into a clean, standard Kolkata job.
 
-Steps: Kolkata filter -> clean text -> salary/experience/job type/work mode
--> skills -> job_key (for de-duplication across sources).
+Steps: Kolkata filter -> too-old filter -> clean text -> salary/experience/job
+type/work mode -> skills -> job_key (for de-duplication across sources).
 """
 import hashlib
 import html
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from pipeline.models import CleanJob, RawJob
 from pipeline.skills import SKILLS
 
 MAX_DESCRIPTION_CHARS = 20000
+# A job is "current" only if it was posted in the last 30 days. Older posts are not
+# shown, even if a job board still lists them (store.close_expired closes them).
+MAX_JOB_AGE_DAYS = 30
 
 # word in a location -> our standard area name (checked in this order)
 KOLKATA_AREAS: list[tuple[str, str]] = [
@@ -216,8 +220,17 @@ def extract_skills(title: str, description: str) -> list[str]:
 
 
 # ---------------------------------------------------------------- main
-def clean_job(raw: RawJob) -> Optional[CleanJob]:
-    """Return a CleanJob, or None if the job is not in Kolkata or is unusable."""
+def is_too_old(posted_at: Optional[datetime], now: Optional[datetime] = None) -> bool:
+    if posted_at is None:
+        return False                                   # unknown date: keep it
+    if posted_at.tzinfo is None:
+        posted_at = posted_at.replace(tzinfo=timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    return now - posted_at > timedelta(days=MAX_JOB_AGE_DAYS)
+
+
+def clean_job(raw: RawJob, now: Optional[datetime] = None) -> Optional[CleanJob]:
+    """Return a CleanJob, or None if the job is not in Kolkata, too old, or unusable."""
     area = find_area(raw.locations)
     title = clean_line(raw.title)
     company = clean_line(raw.company_name)
@@ -225,6 +238,8 @@ def clean_job(raw: RawJob) -> Optional[CleanJob]:
     if not area or not title or not company or not apply_url.startswith(("http://", "https://")):
         return None
     if title_says_other_city(title):
+        return None
+    if is_too_old(raw.posted_at, now):
         return None
 
     description = clean_text(raw.description)
