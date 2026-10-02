@@ -1,0 +1,59 @@
+"""Shapes of the data the API sends back (shown in /docs)."""
+from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel
+
+
+class JobSummary(BaseModel):
+    """One job in a search result list."""
+    id: UUID
+    title: str
+    company_name: str
+    area: str
+    location_raw: Optional[str] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    salary_period: str = "year"
+    experience_min: Optional[float] = None
+    experience_max: Optional[float] = None
+    job_type: Optional[str] = None
+    work_mode: Optional[str] = None
+    skills: list[str] = []
+    posted_at: Optional[datetime] = None
+    apply_url: str
+    source: str                      # show "Jobs by Adzuna" when source == "adzuna"
+    snippet: str = ""                # first part of the description
+
+
+class JobDetail(JobSummary):
+    """Full job page."""
+    description: Optional[str] = None
+    status: str                      # open / closed
+    closed_at: Optional[datetime] = None
+
+
+class JobSearchResponse(BaseModel):
+    items: list[JobSummary]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+class FacetCount(BaseModel):
+    value: str
+    count: int
+
+
+class JobFilters(BaseModel):
+    """Options for the filter dropdowns, built from the jobs that are open right now."""
+    total_open_jobs: int
+    areas: list[FacetCount]
+    companies: list[FacetCount]
+    skills: list[FacetCount]
+    job_types: list[FacetCount]
+    work_modes: list[FacetCount]
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
