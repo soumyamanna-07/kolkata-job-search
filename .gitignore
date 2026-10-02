@@ -1,0 +1,43 @@
+# ---- Secrets: NEVER upload ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- Node / Frontend ----
+node_modules/
+dist/
+build/
+.next/
+npm-debug.log*
+
+# ---- Data & models (too big / private) ----
+data/
+*.csv
+*.pkl
+*.joblib
+*.h5
+*.pt
+uploads/
+
+# ---- Editors & OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Logs ----
+*.log
+logs/
