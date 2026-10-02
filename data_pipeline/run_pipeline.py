@@ -1,5 +1,7 @@
 """Run the data pipeline: collect -> Kolkata filter -> clean -> de-duplicate -> save -> close.
 
+Only CURRENT jobs are kept open: posted in the last 30 days (see normalize.MAX_JOB_AGE_DAYS).
+
 Run from the project root:
     python data_pipeline/run_pipeline.py --dry-run     (collect and show results, write nothing)
     python data_pipeline/run_pipeline.py               (full run, writes to the database)
@@ -103,6 +105,9 @@ def main() -> int:
             with conn.transaction():
                 stats["jobs_new"], stats["jobs_updated"] = store.save_jobs(conn, jobs)
                 stats["jobs_closed"], warnings = store.close_missing(conn, results, started_at)
+                expired = store.close_expired(conn)          # older than 30 days = not current
+                stats["jobs_closed"] += expired
+            log(f"Closed because older than {store.MAX_JOB_AGE_DAYS} days: {expired}")
             for w in warnings:
                 log(f"WARNING: {w}")
 

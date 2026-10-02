@@ -17,7 +17,9 @@ class TestCvApi(unittest.TestCase):
         import psycopg
         from fastapi.testclient import TestClient
 
-        from app import auth, config
+        from app import auth, config, embeddings
+        from tests.test_embeddings import FakeEmbedder
+        embeddings.set_embedder(FakeEmbedder())            # no real AI model needed in tests
         cls.patches = [mock.patch.object(config, "DATABASE_URL", TEST_DB),
                        mock.patch.object(config, "SUPABASE_URL", SUPABASE_URL),
                        mock.patch.object(auth, "_jwks", lambda: FakeJwks())]
@@ -40,6 +42,8 @@ class TestCvApi(unittest.TestCase):
         cls.db.close()
         for p in cls.patches:
             p.stop()
+        from app import embeddings
+        embeddings.set_embedder(None)
 
     def upload(self, url, data=None, headers=None, name="cv.pdf"):
         return self.client.post(url, files={"file": (name, data or self.pdf, "application/pdf")}, headers=headers)
@@ -66,6 +70,9 @@ class TestCvApi(unittest.TestCase):
         r = self.upload("/api/me/cv", headers=self.auth)
         self.assertEqual(r.status_code, 201)
         self.assertIn("sql", r.json()["skills"])
+        has_vec = self.db.execute("select embedding is not null and embedding_hash is not null from public.cvs "
+                                  "where user_id = %s", (self.user_id,)).fetchone()[0]
+        self.assertTrue(has_vec)                                                          # AI embedding saved
         self.upload("/api/me/cv", headers=self.auth, name="new.pdf")                        # replaces old CV
         rows = self.db.execute("select file_name from public.cvs where user_id = %s", (self.user_id,)).fetchall()
         self.assertEqual(rows, [("new.pdf",)])
@@ -84,8 +91,8 @@ class TestCvApi(unittest.TestCase):
     def test_no_contact_details_stored(self):
         self.client.post("/api/me/consent", headers=self.auth)
         self.upload("/api/me/cv", headers=self.auth)
-        row = self.db.execute("select row_to_json(c)::text from public.cvs c where user_id = %s",
-                              (self.user_id,)).fetchone()[0]
+        row = self.db.execute("select (to_jsonb(c) - 'embedding' - 'embedding_hash')::text from public.cvs c where user_id = %s",
+                              (self.user_id,)).fetchone()[0]                     # AI numbers skipped
         for private in ["test@example.com", "90000", "Soumya Test"]:
             self.assertNotIn(private, row)
 

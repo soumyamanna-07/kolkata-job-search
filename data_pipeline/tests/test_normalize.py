@@ -9,6 +9,9 @@ from pipeline.normalize import (
 )
 
 
+NOW = datetime(2026, 10, 2, tzinfo=timezone.utc)
+
+
 def raw(**kw) -> RawJob:
     base = dict(source="lever", source_job_id="1", company_name="ABC Tech Pvt Ltd",
                 title="Data Analyst", apply_url="https://jobs.example.com/1",
@@ -114,7 +117,7 @@ class TestCleanJob(unittest.TestCase):
             description="<p>2-3 years experience with Python and SQL.</p>",
             salary_min=400000, salary_max=600000, salary_currency="INR", salary_period="year",
             job_type_hint="Full-time", work_mode_hint="hybrid",
-            posted_at=datetime(2026, 10, 1, tzinfo=timezone.utc)))
+            posted_at=datetime(2026, 10, 1, tzinfo=timezone.utc)), now=NOW)
         self.assertIsNotNone(job)
         self.assertEqual(job.area, "Kolkata")
         self.assertEqual((job.salary_min, job.salary_max), (400000, 600000))
@@ -122,6 +125,14 @@ class TestCleanJob(unittest.TestCase):
         self.assertEqual(job.job_type, "full_time")
         self.assertEqual(job.work_mode, "hybrid")
         self.assertIn("python", job.skills)
+
+    def test_only_jobs_posted_in_last_30_days(self):
+        # a board can still list a 2019 post, but it is not a current job
+        self.assertIsNone(clean_job(raw(posted_at=datetime(2019, 6, 5, tzinfo=timezone.utc)), now=NOW))
+        self.assertIsNone(clean_job(raw(posted_at=datetime(2026, 8, 25, tzinfo=timezone.utc)), now=NOW))  # 38 days
+        self.assertIsNone(clean_job(raw(posted_at=datetime(2026, 8, 1)), now=NOW))           # no timezone
+        self.assertIsNotNone(clean_job(raw(posted_at=datetime(2026, 9, 10, tzinfo=timezone.utc)), now=NOW))
+        self.assertIsNotNone(clean_job(raw(posted_at=None), now=NOW))                        # date unknown
 
     def test_title_naming_other_city_rejected(self):
         # source said Kolkata, but the title clearly says Kochi
