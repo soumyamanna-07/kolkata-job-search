@@ -127,3 +127,20 @@ class MatchResponse(BaseModel):
     items: list[MatchedJob]
     skill_gap: list[SkillGapItem]    # skills to learn next, most useful first
     scoring_version: str
+
+
+class AssistantQuestion(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+    use_my_cv: bool = False          # logged-in users: let the AI consider their saved CV
+
+
+class AssistantSource(JobSummary):
+    number: int                      # the [n] used in the answer
+    cited: bool                      # True if the answer mentions this job
+
+
+class AssistantAnswer(BaseModel):
+    answer: str
+    ai_written: bool                 # False = AI not available, jobs listed without an AI answer
+    sources: list[AssistantSource]   # the real jobs the answer is based on
+    note: Optional[str] = None       # e.g. why the AI answer is missing
