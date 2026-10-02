@@ -1,6 +1,6 @@
 """Shapes of the data the API sends back (shown in /docs)."""
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -84,3 +84,25 @@ class JobEventIn(BaseModel):
     rank_position: Optional[int] = Field(default=None, ge=1, le=1000)
     match_score: Optional[float] = Field(default=None, ge=0, le=100)
     session_id: Optional[str] = Field(default=None, max_length=64)   # anonymous id for guests
+
+
+class CVParsed(BaseModel):
+    """What we read from a CV. No name, email, phone or address is kept."""
+    skills: list[str]
+    experience_years: Optional[float] = None
+    education: Optional[str] = None
+    job_titles: list[str] = []
+
+
+class CVSaved(CVParsed):
+    id: UUID
+    file_name: Optional[str] = None
+    updated_at: datetime
+
+
+class CVUpdate(BaseModel):
+    """The user can correct what we read from their CV."""
+    skills: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(max_length=60)
+    experience_years: Optional[float] = Field(default=None, ge=0, le=50)
+    education: Optional[str] = Field(default=None, max_length=60)
+    job_titles: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(default=[], max_length=10)
