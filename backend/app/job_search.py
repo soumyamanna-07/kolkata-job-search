@@ -12,11 +12,20 @@ AREAS = ("Kolkata", "Salt Lake", "New Town", "Howrah")
 JOB_TYPES = ("full_time", "part_time", "internship", "contract", "temporary")
 WORK_MODES = ("onsite", "hybrid", "remote")
 
-SUMMARY_COLUMNS = """
-    id, title, company_name, area, location_raw, salary_min, salary_max, salary_period,
-    experience_min, experience_max, job_type, work_mode, skills, posted_at, apply_url, source,
-    left(regexp_replace(coalesce(description, ''), '\\s+', ' ', 'g'), 300) as snippet
-"""
+_SUMMARY_FIELDS = ("id", "title", "company_name", "area", "location_raw", "salary_min", "salary_max",
+                   "salary_period", "experience_min", "experience_max", "job_type", "work_mode", "skills",
+                   "posted_at", "apply_url", "source")
+
+
+def summary_columns(alias: str = "") -> str:
+    """SELECT list for a job summary. alias="j" gives j.id, j.title, ... for joins."""
+    p = f"{alias}." if alias else ""
+    cols = [f"{p}{name}" for name in _SUMMARY_FIELDS]
+    cols.append(f"left(regexp_replace(coalesce({p}description, ''), '\\s+', ' ', 'g'), 300) as snippet")
+    return ", ".join(cols)
+
+
+SUMMARY_COLUMNS = summary_columns()
 
 
 @dataclass

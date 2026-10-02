@@ -15,6 +15,8 @@ def _list(name: str, default: str) -> list[str]:
 APP_ENV = os.getenv("APP_ENV", "development")          # development | production
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+# Only needed for older Supabase projects that sign logins with a shared secret (HS256).
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
 
 # Websites allowed to call this API from a browser (the React app).
 CORS_ORIGINS = _list("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")

@@ -1,0 +1,461 @@
+{
+  "_comment": "Skill vocabulary shared by data_pipeline (tags jobs) and backend (reads CVs). Key = canonical skill name, value = ways it is written. Matching is whole-word and case-insensitive.",
+  "skills": {
+    "python": [
+      "python"
+    ],
+    "java": [
+      "java"
+    ],
+    "javascript": [
+      "javascript",
+      "js",
+      "ecmascript"
+    ],
+    "typescript": [
+      "typescript"
+    ],
+    "c": [
+      "c programming",
+      "c language"
+    ],
+    "c++": [
+      "c++",
+      "cpp"
+    ],
+    "c#": [
+      "c#",
+      "csharp"
+    ],
+    "go": [
+      "golang",
+      "go lang"
+    ],
+    "rust": [
+      "rust"
+    ],
+    "kotlin": [
+      "kotlin"
+    ],
+    "swift": [
+      "swift"
+    ],
+    "php": [
+      "php"
+    ],
+    "ruby": [
+      "ruby"
+    ],
+    "scala": [
+      "scala"
+    ],
+    "r": [
+      "r programming",
+      "r language",
+      "rstudio"
+    ],
+    "matlab": [
+      "matlab"
+    ],
+    "dart": [
+      "dart"
+    ],
+    "bash": [
+      "bash",
+      "shell scripting"
+    ],
+    "html": [
+      "html",
+      "html5"
+    ],
+    "css": [
+      "css",
+      "css3"
+    ],
+    "react": [
+      "react",
+      "reactjs",
+      "react.js"
+    ],
+    "angular": [
+      "angular",
+      "angularjs"
+    ],
+    "vue": [
+      "vue",
+      "vuejs",
+      "vue.js"
+    ],
+    "next.js": [
+      "next.js",
+      "nextjs"
+    ],
+    "node.js": [
+      "node.js",
+      "nodejs",
+      "node js"
+    ],
+    "express": [
+      "express.js",
+      "expressjs"
+    ],
+    "django": [
+      "django"
+    ],
+    "flask": [
+      "flask"
+    ],
+    "fastapi": [
+      "fastapi"
+    ],
+    "spring boot": [
+      "spring boot",
+      "springboot"
+    ],
+    "spring": [
+      "spring framework"
+    ],
+    ".net": [
+      ".net",
+      "dotnet",
+      "asp.net"
+    ],
+    "laravel": [
+      "laravel"
+    ],
+    "tailwind css": [
+      "tailwind",
+      "tailwindcss"
+    ],
+    "bootstrap": [
+      "bootstrap"
+    ],
+    "rest api": [
+      "rest api",
+      "restful",
+      "rest apis"
+    ],
+    "graphql": [
+      "graphql"
+    ],
+    "flutter": [
+      "flutter"
+    ],
+    "react native": [
+      "react native"
+    ],
+    "android": [
+      "android"
+    ],
+    "ios": [
+      "ios development",
+      "ios developer"
+    ],
+    "wordpress": [
+      "wordpress"
+    ],
+    "sql": [
+      "sql"
+    ],
+    "mysql": [
+      "mysql"
+    ],
+    "postgresql": [
+      "postgresql",
+      "postgres"
+    ],
+    "mongodb": [
+      "mongodb",
+      "mongo db"
+    ],
+    "oracle": [
+      "oracle database",
+      "oracle db",
+      "pl/sql"
+    ],
+    "sql server": [
+      "sql server",
+      "mssql"
+    ],
+    "redis": [
+      "redis"
+    ],
+    "elasticsearch": [
+      "elasticsearch"
+    ],
+    "excel": [
+      "excel",
+      "ms excel",
+      "advanced excel"
+    ],
+    "power bi": [
+      "power bi",
+      "powerbi"
+    ],
+    "tableau": [
+      "tableau"
+    ],
+    "pandas": [
+      "pandas"
+    ],
+    "numpy": [
+      "numpy"
+    ],
+    "spark": [
+      "spark",
+      "pyspark",
+      "apache spark"
+    ],
+    "hadoop": [
+      "hadoop"
+    ],
+    "kafka": [
+      "kafka"
+    ],
+    "airflow": [
+      "airflow"
+    ],
+    "etl": [
+      "etl",
+      "elt"
+    ],
+    "data analysis": [
+      "data analysis",
+      "data analytics"
+    ],
+    "data visualization": [
+      "data visualization",
+      "data visualisation"
+    ],
+    "statistics": [
+      "statistics",
+      "statistical analysis"
+    ],
+    "snowflake": [
+      "snowflake"
+    ],
+    "dbt": [
+      "dbt"
+    ],
+    "machine learning": [
+      "machine learning",
+      "ml"
+    ],
+    "deep learning": [
+      "deep learning"
+    ],
+    "nlp": [
+      "nlp",
+      "natural language processing"
+    ],
+    "computer vision": [
+      "computer vision",
+      "opencv"
+    ],
+    "generative ai": [
+      "generative ai",
+      "genai",
+      "gen ai"
+    ],
+    "llm": [
+      "llm",
+      "llms",
+      "large language model",
+      "large language models"
+    ],
+    "rag": [
+      "rag",
+      "retrieval augmented generation",
+      "retrieval-augmented generation"
+    ],
+    "tensorflow": [
+      "tensorflow"
+    ],
+    "pytorch": [
+      "pytorch"
+    ],
+    "scikit-learn": [
+      "scikit-learn",
+      "sklearn",
+      "scikit learn"
+    ],
+    "langchain": [
+      "langchain"
+    ],
+    "hugging face": [
+      "hugging face",
+      "huggingface",
+      "transformers"
+    ],
+    "mlops": [
+      "mlops"
+    ],
+    "aws": [
+      "aws",
+      "amazon web services"
+    ],
+    "azure": [
+      "azure",
+      "microsoft azure"
+    ],
+    "gcp": [
+      "gcp",
+      "google cloud"
+    ],
+    "docker": [
+      "docker"
+    ],
+    "kubernetes": [
+      "kubernetes",
+      "k8s"
+    ],
+    "terraform": [
+      "terraform"
+    ],
+    "jenkins": [
+      "jenkins"
+    ],
+    "ci/cd": [
+      "ci/cd",
+      "ci cd",
+      "continuous integration"
+    ],
+    "linux": [
+      "linux",
+      "unix"
+    ],
+    "git": [
+      "git",
+      "github",
+      "gitlab"
+    ],
+    "devops": [
+      "devops"
+    ],
+    "microservices": [
+      "microservices",
+      "micro services"
+    ],
+    "selenium": [
+      "selenium"
+    ],
+    "manual testing": [
+      "manual testing"
+    ],
+    "automation testing": [
+      "automation testing",
+      "test automation"
+    ],
+    "jira": [
+      "jira"
+    ],
+    "figma": [
+      "figma"
+    ],
+    "ui/ux": [
+      "ui/ux",
+      "ux design",
+      "ui design",
+      "user experience"
+    ],
+    "photoshop": [
+      "photoshop"
+    ],
+    "illustrator": [
+      "illustrator"
+    ],
+    "canva": [
+      "canva"
+    ],
+    "autocad": [
+      "autocad",
+      "auto cad"
+    ],
+    "accounting": [
+      "accounting",
+      "accounts"
+    ],
+    "tally": [
+      "tally",
+      "tally erp"
+    ],
+    "gst": [
+      "gst"
+    ],
+    "taxation": [
+      "taxation",
+      "income tax"
+    ],
+    "sap": [
+      "sap"
+    ],
+    "financial analysis": [
+      "financial analysis",
+      "financial modelling",
+      "financial modeling"
+    ],
+    "ms office": [
+      "ms office",
+      "microsoft office"
+    ],
+    "powerpoint": [
+      "powerpoint"
+    ],
+    "sales": [
+      "sales"
+    ],
+    "business development": [
+      "business development"
+    ],
+    "digital marketing": [
+      "digital marketing"
+    ],
+    "seo": [
+      "seo"
+    ],
+    "social media marketing": [
+      "social media marketing",
+      "smm"
+    ],
+    "content writing": [
+      "content writing",
+      "copywriting"
+    ],
+    "crm": [
+      "crm",
+      "salesforce"
+    ],
+    "customer service": [
+      "customer service",
+      "customer support"
+    ],
+    "recruitment": [
+      "recruitment",
+      "talent acquisition"
+    ],
+    "project management": [
+      "project management"
+    ],
+    "agile": [
+      "agile",
+      "scrum"
+    ],
+    "supply chain": [
+      "supply chain",
+      "logistics"
+    ],
+    "communication": [
+      "communication skills"
+    ],
+    "english": [
+      "english"
+    ],
+    "bengali": [
+      "bengali",
+      "bangla"
+    ],
+    "hindi": [
+      "hindi"
+    ]
+  }
+}
