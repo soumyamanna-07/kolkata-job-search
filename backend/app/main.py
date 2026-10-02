@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config, db
-from app.routers import jobs
+from app.routers import jobs, me
 
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.add_middleware(
 )
 
 app.include_router(jobs.router)
+app.include_router(me.router)
 
 
 @app.get("/health", tags=["system"])
