@@ -35,7 +35,7 @@ class TestPipelineEndToEnd(unittest.TestCase):
              "description": "short", "salary_min": 500000, "salary_max": 700000, "salary_is_predicted": "0"}
             for t in titles]}
 
-    def run_pipeline(self, lever_payload, adzuna_payload, adzuna_ok=True):
+    def run_pipeline(self, lever_payload, adzuna_payload, adzuna_ok=True, adzuna_mode="recent"):
         import run_pipeline
         from pipeline.collectors import base
 
@@ -59,7 +59,8 @@ class TestPipelineEndToEnd(unittest.TestCase):
              mock.patch.object(run_pipeline.config, "ADZUNA_APP_ID", "id"), \
              mock.patch.object(run_pipeline.config, "ADZUNA_APP_KEY", "key"), \
              mock.patch.object(run_pipeline, "DELAY_BETWEEN_COMPANIES", 0), \
-             mock.patch("sys.argv", ["run_pipeline.py"]):
+             mock.patch.object(run_pipeline.adzuna, "PAGE_DELAY", 0), \
+             mock.patch("sys.argv", ["run_pipeline.py", "--adzuna-mode", adzuna_mode]):
             return run_pipeline.main()
 
     def jobs(self):
@@ -96,6 +97,17 @@ class TestPipelineEndToEnd(unittest.TestCase):
         self.run_pipeline(self.lever_jobs("Data Analyst", "ML Engineer"), self.adzuna_page("Data Analyst", "Accountant"))
         status = dict((r[0], r[2]) for r in self.jobs())
         self.assertEqual(status["ML Engineer"], "open")
+
+    def test_adzuna_only_full_mode_closes(self):
+        self.run_pipeline([], self.adzuna_page("Accountant", "Cashier"), adzuna_mode="full")
+        # daily "recent" run no longer lists Cashier -> must stay open (recent is not a full list)
+        self.run_pipeline([], self.adzuna_page("Accountant"), adzuna_mode="recent")
+        status = dict((r[0], r[2]) for r in self.jobs())
+        self.assertEqual(status["Cashier"], "open")
+        # weekly "full" run without Cashier -> now it is closed
+        self.run_pipeline([], self.adzuna_page("Accountant"), adzuna_mode="full")
+        status = dict((r[0], r[2]) for r in self.jobs())
+        self.assertEqual(status, {"Accountant": "open", "Cashier": "closed"})
 
     def test_source_returning_nothing_is_suspicious(self):
         self.run_pipeline(self.lever_jobs("A1", "A2", "A3", "A4", "A5", "A6"), self.adzuna_page())

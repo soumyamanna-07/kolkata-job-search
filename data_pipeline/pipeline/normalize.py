@@ -29,6 +29,21 @@ KOLKATA_AREAS: list[tuple[str, str]] = [
     ("calcutta", "Kolkata"),
 ]
 
+# If a job TITLE names one of these cities (and not Kolkata), the job is not in
+# Kolkata even if a source tagged it so. e.g. "Operations Manager - Kochi".
+OTHER_CITIES = [
+    "mumbai", "bombay", "navi mumbai", "thane", "delhi", "new delhi", "noida", "gurgaon",
+    "gurugram", "faridabad", "ghaziabad", "bangalore", "bengaluru", "hyderabad",
+    "secunderabad", "chennai", "madras", "pune", "kochi", "cochin", "ahmedabad",
+    "jaipur", "lucknow", "chandigarh", "mohali", "indore", "bhopal", "bhubaneswar",
+    "cuttack", "guwahati", "patna", "ranchi", "jamshedpur", "coimbatore", "madurai",
+    "vizag", "visakhapatnam", "vijayawada", "nagpur", "nashik", "surat", "vadodara",
+    "rajkot", "thiruvananthapuram", "trivandrum", "mysore", "mysuru", "mangalore",
+    "mangaluru", "siliguri", "durgapur", "asansol", "goa", "dehradun", "raipur",
+    "kanpur", "varanasi", "agra", "ludhiana", "amritsar",
+]
+OTHER_CITY_PATTERN = re.compile(r"(?<![a-z])(" + "|".join(OTHER_CITIES) + r")(?![a-z])")
+
 COMPANY_SUFFIXES = re.compile(
     r"\b(private|pvt|limited|ltd|llp|inc|incorporated|corp|corporation|co|company|plc|india)\b"
 )
@@ -43,6 +58,12 @@ def find_area(locations: list[str]) -> Optional[str]:
             if re.search(rf"(?<![a-z]){re.escape(word)}(?![a-z])", text):
                 return area
     return None
+
+
+def title_says_other_city(title: str) -> bool:
+    """True if the title names another city and does not mention Kolkata."""
+    text = (title or "").lower()
+    return bool(OTHER_CITY_PATTERN.search(text)) and find_area([text]) is None
 
 
 # ---------------------------------------------------------------- text
@@ -202,6 +223,8 @@ def clean_job(raw: RawJob) -> Optional[CleanJob]:
     company = clean_line(raw.company_name)
     apply_url = (raw.apply_url or "").strip()
     if not area or not title or not company or not apply_url.startswith(("http://", "https://")):
+        return None
+    if title_says_other_city(title):
         return None
 
     description = clean_text(raw.description)

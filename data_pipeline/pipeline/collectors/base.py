@@ -16,16 +16,19 @@ TIMEOUT_SECONDS = 30
 class CollectResult:
     """What one collector run produced.
 
-    complete=True means we got the FULL current list from this source/company,
-    so jobs we did not see can safely be marked closed. If anything failed or
-    was cut short, complete=False and nothing gets closed.
+    complete=True  -> the collector finished without errors.
+    snapshot=True  -> the jobs list is EVERYTHING currently open at this source,
+                      so jobs we did not see can safely be marked closed.
+    A "recent jobs only" fetch is complete but NOT a snapshot, so it never closes jobs.
     """
     source: str
     scope: str                          # e.g. "adzuna" or "lever:company-slug"
     company_id: Optional[str] = None
     jobs: list[RawJob] = field(default_factory=list)
     complete: bool = False
+    snapshot: bool = True
     error: Optional[str] = None
+    requests_made: int = 0
 
 
 def safe_error(error: Exception, secrets: tuple = ()) -> str:
