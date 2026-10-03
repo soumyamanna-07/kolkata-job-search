@@ -236,3 +236,94 @@ class SubmissionReview(BaseModel):
         if self.decision == "reject" and not (self.reason or "").strip():
             raise ValueError("Please give a reason (the employer will see it)")
         return self
+
+
+# ---------------------------------------------------------------- reports and admin panel
+class JobReportIn(BaseModel):
+    """'Report this job' from a user."""
+    reason: Literal["spam", "fake", "already_closed", "wrong_location", "wrong_details", "other"]
+    details: Optional[str] = Field(default=None, max_length=1000)
+
+
+class AdminReport(BaseModel):
+    id: UUID
+    job_id: UUID
+    job_title: str
+    company_name: str
+    job_source: str
+    job_status: str
+    apply_url: str
+    reason: str
+    details: Optional[str] = None
+    reports_for_job: int             # how many open reports this job has
+    status: str                      # open / resolved / dismissed
+    created_at: datetime
+
+
+class ReportResolve(BaseModel):
+    action: Literal["close_job", "dismiss"]
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class AdminUser(BaseModel):
+    id: UUID
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    role: str
+    is_blocked: bool
+    has_cv: bool
+    created_at: datetime
+
+
+class UserBlock(BaseModel):
+    blocked: bool
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class PipelineRun(BaseModel):
+    id: int
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    status: str
+    trigger_type: str
+    total_collected: int
+    kolkata_count: int
+    unique_count: int
+    jobs_new: int
+    jobs_updated: int
+    jobs_closed: int
+    source_stats: dict
+    error_message: Optional[str] = None
+
+
+class AdminAction(BaseModel):
+    id: int
+    admin_email: Optional[str] = None
+    action: str
+    target_table: Optional[str] = None
+    target_id: Optional[str] = None
+    details: dict
+    created_at: datetime
+
+
+class ModelVersion(BaseModel):
+    model_name: str
+    version: str
+    is_active: bool
+    metrics: dict
+    notes: Optional[str] = None
+    trained_at: datetime
+
+
+class AdminStats(BaseModel):
+    open_jobs: int
+    open_jobs_by_source: dict[str, int]
+    new_jobs_7_days: int
+    jobs_without_embedding: int
+    users_by_role: dict[str, int]
+    blocked_users: int
+    saved_cvs: int
+    pending_employers: int
+    pending_job_posts: int
+    open_reports: int
+    last_pipeline_run: Optional[PipelineRun] = None

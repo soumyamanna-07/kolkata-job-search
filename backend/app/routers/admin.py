@@ -1,4 +1,5 @@
-"""Admin review: approve employers and their job posts. Every decision is logged in admin_actions.
+"""Admin Panel API: employers and job posts to review, user reports, users, pipeline health,
+site stats, models and the audit log. Every decision is logged in admin_actions.
 
 Making someone an admin is done only in the database (never through the API):
     update public.profiles set role = 'admin' where id = '<user id>';
@@ -15,7 +16,8 @@ from psycopg.rows import dict_row
 from app.auth import CurrentUser, require_role
 from app.db import get_conn
 from app.embeddings import embed_one, job_text, text_hash, to_pgvector
-from app.schemas import AdminEmployer, AdminSubmission, EmployerReview, SubmissionReview
+from app.schemas import (AdminAction, AdminEmployer, AdminReport, AdminStats, AdminSubmission, AdminUser,
+                         EmployerReview, ModelVersion, PipelineRun, ReportResolve, SubmissionReview, UserBlock)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 admin_only = require_role("admin")
@@ -142,3 +144,152 @@ def review_submission(submission_id: UUID, body: SubmissionReview, admin: Curren
     with conn.cursor(row_factory=dict_row) as cur:
         row = cur.execute(f"{SUBMISSION_SQL} where s.id = %s", (submission_id,)).fetchone()
     return AdminSubmission(**row)
+
+
+# ---------------------------------------------------------------- user reports
+REPORT_SQL = """
+select r.id, r.job_id, j.title as job_title, j.company_name, j.source as job_source, j.status as job_status,
+       j.apply_url, r.reason, r.details, r.status, r.created_at,
+       (select count(*) from public.job_reports r2 where r2.job_id = r.job_id and r2.status = 'open') as reports_for_job
+from public.job_reports r join public.jobs j on j.id = r.job_id
+"""
+
+
+@router.get("/reports", response_model=list[AdminReport])
+def list_reports(status: Literal["open", "resolved", "dismissed", "all"] = "open",
+                 limit: int = Query(100, ge=1, le=500),
+                 admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = Depends(get_conn)):
+    """Jobs users reported. Jobs with the most reports first."""
+    where, params = ("", []) if status == "all" else ("where r.status = %s", [status])
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute(f"{REPORT_SQL} {where} order by reports_for_job desc, r.created_at limit %s",
+                           (*params, limit)).fetchall()
+    return [AdminReport(**r) for r in rows]
+
+
+@router.post("/reports/{report_id}/resolve", response_model=AdminReport)
+def resolve_report(report_id: UUID, body: ReportResolve, admin: CurrentUser = Depends(admin_only),
+                   conn: psycopg.Connection = Depends(get_conn)):
+    """close_job: take the job down and resolve ALL open reports on it. dismiss: the report was wrong."""
+    with conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+        report = cur.execute("select job_id, status from public.job_reports where id = %s for update",
+                             (report_id,)).fetchone()
+        if report is None:
+            raise HTTPException(404, "Report not found")
+        if report["status"] != "open":
+            raise HTTPException(409, f"This report is already {report['status']}.")
+        if body.action == "close_job":
+            cur.execute("update public.jobs set status = 'closed', closed_at = now() "
+                        "where id = %s and status = 'open'", (report["job_id"],))
+            cur.execute("""update public.job_reports set status = 'resolved', resolved_by = %s, resolved_at = now()
+                           where job_id = %s and status = 'open'""", (admin.id, report["job_id"]))
+        else:
+            cur.execute("""update public.job_reports set status = 'dismissed', resolved_by = %s, resolved_at = now()
+                           where id = %s""", (admin.id, report_id))
+        _log(conn, admin, f"report_{body.action}", "job_reports", str(report_id),
+             {"job_id": str(report["job_id"]), "note": body.note})
+        row = cur.execute(f"{REPORT_SQL} where r.id = %s", (report_id,)).fetchone()
+    return AdminReport(**row)
+
+
+# ---------------------------------------------------------------- users
+USER_SQL = """
+select p.id, u.email, p.full_name, p.role, p.is_blocked, p.created_at,
+       exists (select 1 from public.cvs c where c.user_id = p.id) as has_cv
+from public.profiles p left join auth.users u on u.id = p.id
+"""
+
+
+@router.get("/users", response_model=list[AdminUser])
+def list_users(q: Optional[str] = Query(None, max_length=100, description="part of an email or name"),
+               role: Optional[Literal["candidate", "employer", "admin"]] = None,
+               blocked: Optional[bool] = None, limit: int = Query(50, ge=1, le=200),
+               admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = Depends(get_conn)):
+    """Find users (newest first). The CV itself is never shown here, only whether one is saved."""
+    where, params = [], []
+    if q:
+        like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        where.append("(u.email ilike %s or p.full_name ilike %s)")
+        params += [like, like]
+    if role:
+        where.append("p.role = %s")
+        params.append(role)
+    if blocked is not None:
+        where.append("p.is_blocked = %s")
+        params.append(blocked)
+    where_sql = ("where " + " and ".join(where)) if where else ""
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute(f"{USER_SQL} {where_sql} order by p.created_at desc limit %s", (*params, limit)).fetchall()
+    return [AdminUser(**r) for r in rows]
+
+
+@router.post("/users/{user_id}/block", response_model=AdminUser)
+def block_user(user_id: UUID, body: UserBlock, admin: CurrentUser = Depends(admin_only),
+               conn: psycopg.Connection = Depends(get_conn)):
+    """Block or unblock a user. A blocked user can't use any logged-in feature. Admins can't be blocked here."""
+    if str(user_id) == admin.id:
+        raise HTTPException(409, "You can't block yourself.")
+    with conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+        target = cur.execute("select role from public.profiles where id = %s", (user_id,)).fetchone()
+        if target is None:
+            raise HTTPException(404, "User not found")
+        if target["role"] == "admin":
+            raise HTTPException(409, "Admins can't be blocked from the panel.")
+        cur.execute("update public.profiles set is_blocked = %s where id = %s", (body.blocked, user_id))
+        _log(conn, admin, "block_user" if body.blocked else "unblock_user", "profiles", str(user_id),
+             {"reason": body.reason})
+        row = cur.execute(f"{USER_SQL} where p.id = %s", (user_id,)).fetchone()
+    return AdminUser(**row)
+
+
+# ---------------------------------------------------------------- health, stats, models, audit
+@router.get("/pipeline-runs", response_model=list[PipelineRun])
+def pipeline_runs(limit: int = Query(20, ge=1, le=100), admin: CurrentUser = Depends(admin_only),
+                  conn: psycopg.Connection = Depends(get_conn)):
+    """Pipeline Health: the latest job-collection runs."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute("select * from public.pipeline_runs order by started_at desc limit %s", (limit,)).fetchall()
+    return [PipelineRun(**r) for r in rows]
+
+
+@router.get("/stats", response_model=AdminStats)
+def stats(admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = Depends(get_conn)):
+    """Numbers for the Admin Panel dashboard."""
+    one = lambda sql: conn.execute(sql).fetchone()[0]
+    with conn.cursor(row_factory=dict_row) as cur:
+        last = cur.execute("select * from public.pipeline_runs order by started_at desc limit 1").fetchone()
+    return AdminStats(
+        open_jobs=one("select count(*) from public.jobs where status = 'open'"),
+        open_jobs_by_source=dict(conn.execute("select source, count(*) from public.jobs where status = 'open' "
+                                              "group by 1 order by 2 desc").fetchall()),
+        new_jobs_7_days=one("select count(*) from public.jobs where first_seen_at >= now() - interval '7 days'"),
+        jobs_without_embedding=one("select count(*) from public.jobs where status = 'open' and embedding is null"),
+        users_by_role=dict(conn.execute("select role, count(*) from public.profiles group by 1").fetchall()),
+        blocked_users=one("select count(*) from public.profiles where is_blocked"),
+        saved_cvs=one("select count(*) from public.cvs"),
+        pending_employers=one("select count(*) from public.employer_profiles where verification_status = 'pending'"),
+        pending_job_posts=one("select count(*) from public.job_submissions where status = 'pending'"),
+        open_reports=one("select count(*) from public.job_reports where status = 'open'"),
+        last_pipeline_run=PipelineRun(**last) if last else None,
+    )
+
+
+@router.get("/models", response_model=list[ModelVersion])
+def models(admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = Depends(get_conn)):
+    """Model Monitoring: which model/rules version each AI feature uses."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute("select model_name, version, is_active, metrics, notes, trained_at "
+                           "from public.model_versions order by model_name, trained_at desc").fetchall()
+    return [ModelVersion(**r) for r in rows]
+
+
+@router.get("/actions", response_model=list[AdminAction])
+def audit_log(limit: int = Query(50, ge=1, le=500), admin: CurrentUser = Depends(admin_only),
+              conn: psycopg.Connection = Depends(get_conn)):
+    """Audit log: every admin decision, newest first."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute("""select a.id, u.email as admin_email, a.action, a.target_table, a.target_id,
+                                     a.details, a.created_at
+                              from public.admin_actions a left join auth.users u on u.id = a.admin_id
+                              order by a.created_at desc, a.id desc limit %s""", (limit,)).fetchall()
+    return [AdminAction(**r) for r in rows]
