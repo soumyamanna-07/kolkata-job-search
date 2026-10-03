@@ -33,3 +33,18 @@ LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
 # Stay inside the free plan: questions per visitor per minute, and AI answers per day for the whole site.
 ASSISTANT_PER_MINUTE = int(os.getenv("ASSISTANT_PER_MINUTE", "6"))
 ASSISTANT_DAILY_AI_ANSWERS = int(os.getenv("ASSISTANT_DAILY_AI_ANSWERS", "900"))
+
+# Links inside emails: the website (job pages) and this API (unsubscribe links).
+APP_URL = os.getenv("APP_URL", "http://localhost:5173").strip().rstrip("/")
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000").strip().rstrip("/")
+
+# Job alert emails, through any SMTP server (Gmail app password, Brevo, ...). No SMTP_HOST = no emails sent.
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))           # 587 = STARTTLS, 465 = SSL
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+MAIL_FROM = os.getenv("MAIL_FROM", "").strip()            # the address emails come from
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Kolkata Live Job Search").strip()
+# Signs the unsubscribe links in emails, so nobody can switch off other people's alerts. Keep it secret.
+ALERTS_SECRET = os.getenv("ALERTS_SECRET", "").strip()
+ALERT_EMAILS_PER_RUN = int(os.getenv("ALERT_EMAILS_PER_RUN", "400"))   # Gmail allows ~500 a day
