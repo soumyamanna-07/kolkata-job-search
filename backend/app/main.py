@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config, db
-from app.routers import admin, assistant, cv, employer, jobs, match, me, reports
+from app.routers import admin, assistant, cv, employer, insights, jobs, match, me, reports
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.add_middleware(
 
 app.include_router(jobs.router)
 app.include_router(reports.router)
+app.include_router(insights.router)
 app.include_router(me.router)
 app.include_router(cv.router)
 app.include_router(match.router)

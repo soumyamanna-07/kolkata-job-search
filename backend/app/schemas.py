@@ -327,3 +327,39 @@ class AdminStats(BaseModel):
     pending_job_posts: int
     open_reports: int
     last_pipeline_run: Optional[PipelineRun] = None
+
+
+# ---------------------------------------------------------------- market insights
+class Count(BaseModel):
+    value: str
+    count: int
+
+
+class SalaryBand(BaseModel):
+    """Yearly INR, from jobs that state a salary. Empty when too few jobs state one."""
+    jobs_with_salary: int
+    p25: Optional[int] = None
+    median: Optional[int] = None
+    p75: Optional[int] = None
+
+
+class SkillInsight(BaseModel):
+    skill: str
+    jobs: int
+    share: float                     # % of all open jobs that ask for it
+    salary: SalaryBand
+    fresher_friendly_jobs: Optional[int] = None
+    often_with: list[Count] = []     # skills asked together with this one
+    top_companies: list[Count] = []
+
+
+class MarketInsights(BaseModel):
+    open_jobs: int
+    fresher_friendly_jobs: int       # experience needed: 1 year or less
+    fresher_friendly_share: float
+    top_skills: list[SkillInsight]
+    top_companies: list[Count]
+    by_area: list[Count]
+    by_job_type: list[Count]
+    salary: SalaryBand
+    posted_per_day: list[Count]      # value = date (YYYY-MM-DD)
