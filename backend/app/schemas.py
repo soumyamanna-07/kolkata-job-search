@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Annotated, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class JobSummary(BaseModel):
@@ -144,3 +144,95 @@ class AssistantAnswer(BaseModel):
     ai_written: bool                 # False = AI not available, jobs listed without an AI answer
     sources: list[AssistantSource]   # the real jobs the answer is based on
     note: Optional[str] = None       # e.g. why the AI answer is missing
+
+
+# ---------------------------------------------------------------- employer portal
+Area = Literal["Kolkata", "Salt Lake", "New Town", "Howrah"]
+JobType = Literal["full_time", "part_time", "internship", "contract", "temporary"]
+WorkMode = Literal["onsite", "hybrid", "remote"]
+
+
+class EmployerProfileIn(BaseModel):
+    """Company details. An admin checks them before the employer can post jobs."""
+    company_name: str = Field(min_length=2, max_length=120)
+    official_email: str = Field(max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    website: Optional[str] = Field(default=None, max_length=300, pattern=r"^https?://\S+$")
+    gst_or_cin: Optional[str] = Field(default=None, max_length=25, pattern=r"^[A-Za-z0-9]+$")
+
+
+class EmployerProfile(EmployerProfileIn):
+    verification_status: str          # pending / approved / rejected / blocked
+    rejection_reason: Optional[str] = None
+    updated_at: datetime
+
+
+class JobSubmissionIn(BaseModel):
+    """A job an employer wants to publish. It goes live only after an admin approves it."""
+    title: str = Field(min_length=3, max_length=120)
+    description: str = Field(min_length=50, max_length=8000)
+    skills: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(default=[], max_length=30)
+    location: Optional[str] = Field(default=None, max_length=120)
+    area: Area = "Kolkata"
+    apply_url: str = Field(max_length=500, pattern=r"^https?://\S+$")
+    salary_min: Optional[int] = Field(default=None, ge=0, le=100_000_000)   # yearly INR
+    salary_max: Optional[int] = Field(default=None, ge=0, le=100_000_000)
+    experience_min: Optional[float] = Field(default=None, ge=0, le=50)
+    experience_max: Optional[float] = Field(default=None, ge=0, le=50)
+    job_type: Optional[JobType] = None
+    work_mode: Optional[WorkMode] = None
+
+    @model_validator(mode="after")
+    def ranges_make_sense(self):
+        if self.salary_min is not None and self.salary_max is not None and self.salary_min > self.salary_max:
+            raise ValueError("salary_min must not be more than salary_max")
+        if (self.experience_min is not None and self.experience_max is not None
+                and self.experience_min > self.experience_max):
+            raise ValueError("experience_min must not be more than experience_max")
+        return self
+
+
+class JobSubmission(JobSubmissionIn):
+    id: UUID
+    status: str                       # pending / approved / rejected / closed
+    rejection_reason: Optional[str] = None
+    published_job_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------- admin review
+class AdminEmployer(EmployerProfile):
+    user_id: UUID
+    login_email: Optional[str] = None  # the email they log in with (can differ from official_email)
+    created_at: datetime
+
+
+class AdminSubmission(JobSubmission):
+    employer_id: UUID
+    company_name: str
+    official_email: str
+    employer_status: str
+    spam_score: Optional[float] = None
+    spam_reasons: list[str] = []
+
+
+class EmployerReview(BaseModel):
+    decision: Literal["approve", "reject", "block"]
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def reason_needed(self):
+        if self.decision != "approve" and not (self.reason or "").strip():
+            raise ValueError("Please give a reason (the employer will see it)")
+        return self
+
+
+class SubmissionReview(BaseModel):
+    decision: Literal["approve", "reject"]
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def reason_needed(self):
+        if self.decision == "reject" and not (self.reason or "").strip():
+            raise ValueError("Please give a reason (the employer will see it)")
+        return self
