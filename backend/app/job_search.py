@@ -5,6 +5,7 @@ Every user value goes in as a query PARAMETER (never pasted into SQL), so
 search text cannot break or inject into the query.
 """
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional
 
 SORTS = ("relevance", "newest", "salary")
@@ -40,6 +41,7 @@ class JobFiltersIn:
     job_types: list[str] = field(default_factory=list)
     work_modes: list[str] = field(default_factory=list)
     posted_within_days: Optional[int] = None
+    seen_since: Optional[datetime] = None         # job alerts: only jobs we first saw after this time
     sort: str = "relevance"
     page: int = 1
     page_size: int = 20
@@ -100,6 +102,10 @@ def build_search_query(f: JobFiltersIn) -> tuple[str, str, dict]:
     if f.posted_within_days:
         params["posted_within_days"] = f.posted_within_days
         where.append("coalesce(posted_at, first_seen_at) >= now() - make_interval(days => %(posted_within_days)s)")
+
+    if f.seen_since:
+        params["seen_since"] = f.seen_since
+        where.append("first_seen_at > %(seen_since)s")
 
     newest = "coalesce(posted_at, first_seen_at) desc"
     if f.sort == "salary":
