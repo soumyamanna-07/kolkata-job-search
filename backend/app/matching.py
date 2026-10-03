@@ -40,9 +40,9 @@ TOO_SENIOR_FACTOR = 0.7
 JUNIOR_TITLE = re.compile(r"\b(intern|internship|trainee|fresher|apprentice|graduate|junior|jr)\b", re.I)
 SENIOR_TITLES = [
     (re.compile(r"\b(director|head of|vice president|vp|chief)\b", re.I), 10.0),
-    (re.compile(r"\bsenior manager\b", re.I), 8.0),
+    (re.compile(r"\bsenior man(a)?ger\b", re.I), 8.0),          # "manger": a common typo in job titles
     (re.compile(r"\b(principal|architect)\b", re.I), 7.0),
-    (re.compile(r"\bmanager\b", re.I), 5.0),
+    (re.compile(r"\bman(a)?ger\b", re.I), 5.0),
     (re.compile(r"\b(lead|staff)\b", re.I), 5.0),
     (re.compile(r"\b(senior|sr)\b", re.I), 4.0),
 ]
