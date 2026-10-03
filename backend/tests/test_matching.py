@@ -39,6 +39,7 @@ class TestSignals(unittest.TestCase):
         self.assertEqual(title_min_years("Azure Data Architect - Manager"), 7.0)
         self.assertEqual(title_min_years("Lead Artificial Intelligence Engineer"), 5.0)
         self.assertEqual(title_min_years("Sr. Data Analyst"), 4.0)
+        self.assertEqual(title_min_years("ServiceNow - Moveworks AI - Manger"), 5.0)      # typo in a real title
         self.assertIsNone(title_min_years("Data Analyst"))
 
     def test_experience(self):
