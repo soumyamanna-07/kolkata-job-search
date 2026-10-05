@@ -15,7 +15,7 @@ WORK_MODES = ("onsite", "hybrid", "remote")
 
 _SUMMARY_FIELDS = ("id", "title", "company_name", "area", "location_raw", "salary_min", "salary_max",
                    "salary_period", "experience_min", "experience_max", "job_type", "work_mode", "skills",
-                   "posted_at", "apply_url", "source")
+                   "posted_at", "apply_url", "source", "posted_by")
 
 
 def summary_columns(alias: str = "") -> str:

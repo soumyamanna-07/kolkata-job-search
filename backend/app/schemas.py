@@ -24,6 +24,7 @@ class JobSummary(BaseModel):
     posted_at: Optional[datetime] = None
     apply_url: str
     source: str                      # show "Jobs by Adzuna" when source == "adzuna"
+    posted_by: Optional[str] = None  # recruitment agency that posted it: show "via <name>"
     snippet: str = ""                # first part of the description
 
 
@@ -153,11 +154,13 @@ WorkMode = Literal["onsite", "hybrid", "remote"]
 
 
 class EmployerProfileIn(BaseModel):
-    """Company details. An admin checks them before the employer can post jobs."""
+    """Company details of a recruiter. An admin checks them before any job can be posted.
+    account_kind "agency" = a recruitment agency that posts jobs for client companies."""
     company_name: str = Field(min_length=2, max_length=120)
     official_email: str = Field(max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     website: Optional[str] = Field(default=None, max_length=300, pattern=r"^https?://\S+$")
     gst_or_cin: Optional[str] = Field(default=None, max_length=25, pattern=r"^[A-Za-z0-9]+$")
+    account_kind: Literal["company", "agency"] = "company"   # in-house HR, or a recruitment agency
 
 
 class EmployerProfile(EmployerProfileIn):
@@ -170,6 +173,7 @@ class JobSubmissionIn(BaseModel):
     """A job an employer wants to publish. It goes live only after an admin approves it."""
     title: str = Field(min_length=3, max_length=120)
     description: str = Field(min_length=50, max_length=8000)
+    hiring_for: Optional[str] = Field(default=None, min_length=2, max_length=120)  # agencies: the client company
     skills: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(default=[], max_length=30)
     location: Optional[str] = Field(default=None, max_length=120)
     area: Area = "Kolkata"
@@ -210,6 +214,7 @@ class AdminEmployer(EmployerProfile):
 class AdminSubmission(JobSubmission):
     employer_id: UUID
     company_name: str
+    account_kind: str = "company"
     official_email: str
     employer_status: str
     spam_score: Optional[float] = None

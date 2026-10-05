@@ -24,15 +24,15 @@ admin_only = require_role("admin")
 log = logging.getLogger("kjs.admin")
 
 EMPLOYER_SQL = """
-select e.user_id, e.company_name, e.official_email, e.website, e.gst_or_cin, e.verification_status,
-       e.rejection_reason, e.updated_at, e.created_at, u.email as login_email
+select e.user_id, e.company_name, e.official_email, e.website, e.gst_or_cin, e.account_kind,
+       e.verification_status, e.rejection_reason, e.updated_at, e.created_at, u.email as login_email
 from public.employer_profiles e left join auth.users u on u.id = e.user_id
 """
 SUBMISSION_SQL = """
-select s.id, s.title, s.description, s.skills, s.location, s.area, s.apply_url, s.salary_min, s.salary_max,
-       s.experience_min, s.experience_max, s.job_type, s.work_mode, s.status, s.rejection_reason,
+select s.id, s.title, s.description, s.hiring_for, s.skills, s.location, s.area, s.apply_url, s.salary_min,
+       s.salary_max, s.experience_min, s.experience_max, s.job_type, s.work_mode, s.status, s.rejection_reason,
        s.published_job_id, s.created_at, s.updated_at, s.employer_id, s.spam_score, s.spam_reasons,
-       e.company_name, e.official_email, e.verification_status as employer_status, e.company_id
+       e.company_name, e.official_email, e.account_kind, e.verification_status as employer_status, e.company_id
 from public.job_submissions s join public.employer_profiles e on e.user_id = s.employer_id
 """
 
@@ -91,17 +91,20 @@ def list_submissions(status: Literal["pending", "approved", "rejected", "closed"
 
 
 def _publish(cur, sub: dict) -> UUID:
-    """Copy an approved post into the live jobs table."""
+    """Copy an approved post into the live jobs table. Agency posts show the client company,
+    with the agency in posted_by ("via <agency>")."""
+    agency = sub["account_kind"] == "agency" and bool(sub["hiring_for"])
+    company_name = sub["hiring_for"] if agency else sub["company_name"]
     return cur.execute(
-        """insert into public.jobs (job_key, source, source_job_id, company_id, company_name, title, description,
-               location_raw, area, apply_url, salary_min, salary_max, experience_min, experience_max, job_type,
-               work_mode, skills, posted_at, employer_id, status)
-           values (%s, 'employer', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), %s, 'open')
+        """insert into public.jobs (job_key, source, source_job_id, company_id, company_name, posted_by, title,
+               description, location_raw, area, apply_url, salary_min, salary_max, experience_min, experience_max,
+               job_type, work_mode, skills, posted_at, employer_id, status)
+           values (%s, 'employer', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), %s, 'open')
            returning id""",
-        (f"employer-{sub['id']}", str(sub["id"]), sub["company_id"], sub["company_name"], sub["title"],
-         sub["description"], sub["location"], sub["area"], sub["apply_url"], sub["salary_min"], sub["salary_max"],
-         sub["experience_min"], sub["experience_max"], sub["job_type"], sub["work_mode"], sub["skills"],
-         sub["employer_id"])).fetchone()["id"]
+        (f"employer-{sub['id']}", str(sub["id"]), None if agency else sub["company_id"], company_name,
+         sub["company_name"] if agency else None, sub["title"], sub["description"], sub["location"], sub["area"],
+         sub["apply_url"], sub["salary_min"], sub["salary_max"], sub["experience_min"], sub["experience_max"],
+         sub["job_type"], sub["work_mode"], sub["skills"], sub["employer_id"])).fetchone()["id"]
 
 
 def _embed_now(conn: psycopg.Connection, job_id: UUID, sub: dict) -> None:
