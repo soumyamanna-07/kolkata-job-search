@@ -1,11 +1,13 @@
-"""Endpoints for the logged-in user: profile, privacy consent, saved jobs, activity."""
-from typing import Optional
+"""Endpoints for the logged-in user: profile, privacy consent, delete account, saved jobs, activity."""
+from typing import Literal, Optional
 from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from psycopg.rows import dict_row
+from pydantic import BaseModel
 
+from app import account
 from app.auth import CurrentUser, get_current_user, get_optional_user
 from app.db import get_conn
 from app.job_search import summary_columns
@@ -42,6 +44,24 @@ def give_consent(user: CurrentUser = Depends(get_current_user), conn: psycopg.Co
         "where id = %s returning privacy_consent_at", (user.id,)).fetchone()
     user.privacy_consent_at = row[0]
     return _profile(user)
+
+
+class AccountDelete(BaseModel):
+    confirm: Literal["DELETE MY ACCOUNT"]          # typed on purpose, so nobody deletes by accident
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(body: AccountDelete, user: CurrentUser = Depends(get_current_user),
+              conn: psycopg.Connection = Depends(get_conn)):
+    """Delete your account and everything personal we stored: CV data, saved jobs, alerts.
+    Employers: your open jobs are closed. This cannot be undone."""
+    try:
+        account.delete_account(conn, user.id)
+    except account.CannotDelete as exc:
+        raise HTTPException(409, str(exc))
+    except LookupError:
+        raise HTTPException(404, "Account not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------- saved jobs
