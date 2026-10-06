@@ -7,7 +7,7 @@ Run from the project root:
     python data_pipeline/run_pipeline.py               (full run, writes to the database)
 
 Options:
-    --sources lever,greenhouse,adzuna   only run these sources
+    --sources lever,greenhouse,ashby,workable,adzuna   only run these sources
     --adzuna-mode recent|full           recent = new jobs only (daily), full = all jobs + closing (weekly)
     --trigger schedule|manual           recorded in pipeline_runs (GitHub Actions uses schedule)
 """
@@ -17,12 +17,14 @@ import time
 import traceback
 
 from pipeline import config, store
-from pipeline.collectors import adzuna, greenhouse, lever
+from pipeline.collectors import adzuna, ashby, greenhouse, lever, workable
 from pipeline.collectors.base import CollectResult, make_session
 from pipeline.db import connect
 from pipeline.normalize import clean_job, deduplicate
 
-ALL_SOURCES = ("greenhouse", "lever", "adzuna")
+ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "adzuna")
+# company job boards: platform name -> collector
+BOARD_COLLECTORS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby, "workable": workable}
 DELAY_BETWEEN_COMPANIES = 0.5   # seconds - be polite to job boards
 
 
@@ -37,7 +39,7 @@ def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "re
         platform = company["ats_platform"]
         if platform not in sources:
             continue
-        module = greenhouse if platform == "greenhouse" else lever
+        module = BOARD_COLLECTORS[platform]
         r = module.collect(session, company["ats_token"], company["name"], company["id"])
         results.append(r)
         log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")

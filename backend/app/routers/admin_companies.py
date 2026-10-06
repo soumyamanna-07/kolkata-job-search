@@ -1,6 +1,6 @@
 """Admin Panel: Company List - the Kolkata companies whose own job boards the pipeline reads.
 
-Add a company with its Greenhouse / Lever board code, and the next pipeline run collects
+Add a company with its Greenhouse / Lever / Ashby / Workable board code, and the next pipeline run collects
 its Kolkata jobs directly (better quality than aggregators). Check the board code first
 with POST /api/admin/companies/check-board. Every change is written to the audit log.
 """
@@ -51,7 +51,7 @@ class Company(CompanyIn):
 
 
 class BoardCheckIn(BaseModel):
-    ats_platform: Literal["greenhouse", "lever"]
+    ats_platform: Literal["greenhouse", "lever", "ashby", "workable"]
     ats_token: str = Field(min_length=1, max_length=100, pattern=companies.TOKEN_PATTERN)
 
 
@@ -110,7 +110,7 @@ def list_companies(q: Optional[str] = Query(None, max_length=100), platform: Opt
 
 @router.post("/companies/check-board", response_model=BoardCheckOut)
 def check_board(body: BoardCheckIn, admin: CurrentUser = Depends(admin_only)):
-    """Look at a Greenhouse / Lever board before adding it: does the code work, how many Kolkata jobs?"""
+    """Look at a job board before adding it: does the code work, how many Kolkata jobs?"""
     with companies.make_client() as client:
         return companies.check_board(client, body.ats_platform, body.ats_token).__dict__
 
@@ -118,7 +118,8 @@ def check_board(body: BoardCheckIn, admin: CurrentUser = Depends(admin_only)):
 @router.post("/companies", response_model=Company, status_code=status.HTTP_201_CREATED)
 def add_company(body: CompanyIn, admin: CurrentUser = Depends(admin_only),
                 conn: psycopg.Connection = Depends(get_conn)):
-    """Add a company. With a Greenhouse / Lever board code, the next pipeline run collects its jobs."""
+    """Add a company. With a Greenhouse / Lever / Ashby / Workable board code, the next pipeline run collects
+    its jobs."""
     try:
         with conn.transaction():
             new_id = conn.execute(

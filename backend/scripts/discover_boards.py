@@ -1,4 +1,4 @@
-"""Find companies whose Greenhouse / Lever job boards list Kolkata jobs right now.
+"""Find companies whose Greenhouse / Lever / Ashby / Workable job boards list Kolkata jobs right now.
 
 Tries each candidate board code on both platforms, keeps only boards that answer AND
 have at least one job in Kolkata / Salt Lake / New Town / Howrah, and adds them to
@@ -23,7 +23,7 @@ CSV_COLUMNS = ["name", "website", "careers_url", "ats_platform", "ats_token", "n
 DELAY_SECONDS = 0.4                   # be polite to the job boards
 
 # (company name, board code) - India-hiring companies that are known or likely to use
-# Greenhouse or Lever. The script checks each one; wrong guesses are simply skipped.
+# one of these platforms. The script checks each one; wrong guesses are simply skipped.
 CANDIDATES = [
     ("PhonePe", "phonepe"), ("Postman", "postman"), ("BrowserStack", "browserstack"), ("Groww", "groww"),
     ("Razorpay", "razorpay"), ("Dream Sports", "dreamsports"), ("InMobi", "inmobi"), ("Zeta", "zeta"),
@@ -90,10 +90,11 @@ def add_to_csv(found: list[dict], path: Path = CSV_PATH) -> int:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Find Greenhouse / Lever boards that list Kolkata jobs.")
+    parser = argparse.ArgumentParser(description="Find company job boards that list Kolkata jobs.")
     parser.add_argument("--dry-run", action="store_true", help="only show, do not change companies.csv")
     args = parser.parse_args(argv)
-    print(f"Checking {len(CANDIDATES)} companies on Greenhouse and Lever (boards that exist are listed)...")
+    print(f"Checking {len(CANDIDATES)} companies on {', '.join(companies.COLLECTED_PLATFORMS)} "
+          "(boards that exist are listed)...")
     with companies.make_client() as client:
         found = discover(client)
     print(f"\nBoards with Kolkata jobs: {len(found)}")

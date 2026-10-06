@@ -84,7 +84,8 @@ def load_companies(conn: psycopg.Connection) -> list[dict]:
     """Active companies that have a job-board code on a platform we can collect from."""
     rows = conn.execute(
         """select id::text, name, ats_platform, ats_token from public.companies
-           where is_active and ats_token is not null and ats_platform in ('greenhouse', 'lever')
+           where is_active and ats_token is not null
+             and ats_platform in ('greenhouse', 'lever', 'ashby', 'workable')
            order by name"""
     ).fetchall()
     return [dict(id=r[0], name=r[1], ats_platform=r[2], ats_token=r[3]) for r in rows]

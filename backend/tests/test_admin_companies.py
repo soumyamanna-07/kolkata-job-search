@@ -37,7 +37,7 @@ class FakeClient:
 
     def get(self, url):
         self.urls.append(url)
-        answer = self.routes[url]
+        answer = self.routes.get(url, FakeResponse(404))      # unknown board: "not found"
         if isinstance(answer, Exception):
             raise answer
         return answer
@@ -51,6 +51,8 @@ class FakeClient:
 
 GH_URL = "https://boards-api.greenhouse.io/v1/boards/{}/jobs"
 LV_URL = "https://api.lever.co/v0/postings/{}?mode=json"
+AB_URL = "https://api.ashbyhq.com/posting-api/job-board/{}"
+WK_URL = "https://www.workable.com/api/accounts/{}"
 
 
 class TestCompanyHelpers(unittest.TestCase):
@@ -68,6 +70,23 @@ class TestCompanyHelpers(unittest.TestCase):
         r = check_board(FakeClient({LV_URL.format("xyz"): FakeResponse(200, LEVER)}), "lever", "xyz")
         self.assertEqual((r.ok, r.jobs, r.kolkata_jobs, r.sample_titles), (True, 2, 1, ["ML Engineer"]))
 
+    def test_ashby_and_workable_boards(self):
+        ashby = {"jobs": [{"title": "Data Engineer", "location": "Remote", "isListed": True,
+                           "secondaryLocations": [{"location": "Kolkata"}]},
+                          {"title": "Hidden", "location": "Kolkata", "isListed": False}]}
+        workable = {"jobs": [{"title": "QA Engineer", "location": {"location_str": "Salt Lake, Kolkata, India"}},
+                             {"title": "Support", "city": "Pune", "state": "MH"}]}
+        client = FakeClient({AB_URL.format("x"): FakeResponse(200, ashby),
+                             WK_URL.format("y"): FakeResponse(200, workable)})
+        self.assertEqual(check_board(client, "ashby", "x").__dict__,
+                         {"ok": True, "jobs": 1, "kolkata_jobs": 1, "sample_titles": ["Data Engineer"], "error": None})
+        r = check_board(client, "workable", "y")
+        self.assertEqual((r.jobs, r.kolkata_jobs, r.sample_titles), (2, 1, ["QA Engineer"]))
+        empty = FakeClient({WK_URL.format("ghost"): FakeResponse(200, {"jobs": []}),
+                            WK_URL.format("real"): FakeResponse(200, {"name": "Real Co", "jobs": []})})
+        self.assertIn("No job board", check_board(empty, "workable", "ghost").error)   # unknown account
+        self.assertEqual(check_board(empty, "workable", "real").ok, True)              # real, just no jobs today
+
     def test_problems(self):
         client = FakeClient({GH_URL.format("nope"): FakeResponse(404), GH_URL.format("down"): FakeResponse(503),
                              GH_URL.format("odd"): FakeResponse(200, None), LV_URL.format("odd"): FakeResponse(200, {}),
@@ -77,7 +96,7 @@ class TestCompanyHelpers(unittest.TestCase):
         self.assertIn("could not read", check_board(client, "greenhouse", "odd").error)
         self.assertIn("could not read", check_board(client, "lever", "odd").error)
         self.assertIn("Could not reach", check_board(client, "greenhouse", "far").error)
-        self.assertFalse(check_board(client, "workable", "abc").ok)                 # not supported yet
+        self.assertFalse(check_board(client, "smartrecruiters", "abc").ok)          # not supported
         self.assertFalse(check_board(client, "greenhouse", "../admin").ok)          # unsafe code never sent
         self.assertNotIn("../admin", " ".join(client.urls))
 
