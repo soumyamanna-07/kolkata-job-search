@@ -1,8 +1,9 @@
 """Admin Panel: Company List - the Kolkata companies whose own job boards the pipeline reads.
 
-Add a company with its Greenhouse / Lever / Ashby / Workable board code, and the next pipeline run collects
-its Kolkata jobs directly (better quality than aggregators). Check the board code first
-with POST /api/admin/companies/check-board. Every change is written to the audit log.
+Add a company with its Greenhouse / Lever / Ashby / Workable board code, and the next pipeline run
+collects its Kolkata jobs directly (better quality than aggregators). Check the board code first
+with POST /api/admin/companies/check-board. Any other company with a careers_url is read by the
+career-page reader (Google-Jobs tags). Every change is written to the audit log.
 """
 from datetime import datetime
 from typing import Literal, Optional
@@ -43,7 +44,7 @@ class CompanyIn(BaseModel):
 
 class Company(CompanyIn):
     id: UUID
-    collected: bool                       # True = the daily pipeline reads this company's board
+    collected: bool                       # True = the daily pipeline reads its job board or careers page
     open_jobs: int = 0
     last_job_seen_at: Optional[datetime] = None
     created_at: datetime
@@ -66,7 +67,8 @@ class BoardCheckOut(BaseModel):
 LIST_SQL = """
 select c.id, c.name, c.website, c.careers_url, c.ats_platform, c.ats_token, c.notes, c.is_active,
        c.created_at, c.updated_at,
-       (c.is_active and c.ats_token is not null and c.ats_platform = any(%(collected)s)) as collected,
+       (c.is_active and ((c.ats_token is not null and c.ats_platform = any(%(collected)s))
+                         or (c.careers_url is not null and c.ats_platform <> all(%(collected)s)))) as collected,
        count(j.id) filter (where j.status = 'open') as open_jobs,
        max(j.last_seen_at) as last_job_seen_at
 from public.companies c left join public.jobs j on j.company_id = c.id

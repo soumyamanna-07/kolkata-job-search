@@ -7,7 +7,7 @@ Run from the project root:
     python data_pipeline/run_pipeline.py               (full run, writes to the database)
 
 Options:
-    --sources lever,greenhouse,ashby,workable,adzuna   only run these sources
+    --sources lever,greenhouse,ashby,workable,career_page,adzuna   only run these sources
     --adzuna-mode recent|full           recent = new jobs only (daily), full = all jobs + closing (weekly)
     --trigger schedule|manual           recorded in pipeline_runs (GitHub Actions uses schedule)
 """
@@ -17,12 +17,12 @@ import time
 import traceback
 
 from pipeline import config, store
-from pipeline.collectors import adzuna, ashby, greenhouse, lever, workable
+from pipeline.collectors import adzuna, ashby, career_page, greenhouse, lever, workable
 from pipeline.collectors.base import CollectResult, make_session
 from pipeline.db import connect
 from pipeline.normalize import clean_job, deduplicate
 
-ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "adzuna")
+ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "adzuna")
 # company job boards: platform name -> collector
 BOARD_COLLECTORS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby, "workable": workable}
 DELAY_BETWEEN_COMPANIES = 0.5   # seconds - be polite to job boards
@@ -32,7 +32,8 @@ def log(message: str) -> None:
     print(message, flush=True)
 
 
-def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "recent") -> list[CollectResult]:
+def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "recent",
+                career_pages: list[dict] = ()) -> list[CollectResult]:
     session = make_session()
     results = []
     for company in companies:
@@ -44,6 +45,12 @@ def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "re
         results.append(r)
         log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
         time.sleep(DELAY_BETWEEN_COMPANIES)
+    if "career_page" in sources:
+        for company in career_pages:
+            r = career_page.collect(session, company["careers_url"], company["name"], company["id"])
+            results.append(r)
+            log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
+            time.sleep(DELAY_BETWEEN_COMPANIES)
     if "adzuna" in sources:
         r = adzuna.collect(session, config.ADZUNA_APP_ID, config.ADZUNA_APP_KEY, adzuna_mode)
         results.append(r)
@@ -82,7 +89,8 @@ def main() -> int:
     with connect() as conn:
         conn.autocommit = True
         companies = store.load_companies(conn)
-        log(f"Companies with a job board: {len(companies)}")
+        pages = store.load_career_pages(conn)
+        log(f"Companies with a job board: {len(companies)} | with a careers page to read: {len(pages)}")
 
         run_id = started_at = None
         if not args.dry_run:
@@ -91,7 +99,7 @@ def main() -> int:
 
         try:
             log("Collecting:")
-            results = collect_all(companies, sources, args.adzuna_mode)
+            results = collect_all(companies, sources, args.adzuna_mode, pages)
             jobs, stats = process(results)
             log(f"Total collected: {stats['total_collected']} -> Kolkata: {stats['kolkata_count']} "
                 f"-> Unique: {stats['unique_count']}")
@@ -122,7 +130,8 @@ def main() -> int:
 
         except Exception as error:  # record the failure, then re-raise so CI shows it
             if run_id is not None:
-                store.finish_run(conn, run_id, "failed", {}, f"{type(error).__name__}: {error}\n{traceback.format_exc()}")
+                store.finish_run(conn, run_id, "failed", {},
+                                 f"{type(error).__name__}: {error}\n{traceback.format_exc()}")
             raise
 
 

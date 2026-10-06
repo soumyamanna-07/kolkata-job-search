@@ -91,6 +91,17 @@ def load_companies(conn: psycopg.Connection) -> list[dict]:
     return [dict(id=r[0], name=r[1], ats_platform=r[2], ats_token=r[3]) for r in rows]
 
 
+def load_career_pages(conn: psycopg.Connection) -> list[dict]:
+    """Active companies without a supported job board, but with a careers page to read."""
+    rows = conn.execute(
+        """select id::text, name, careers_url from public.companies
+           where is_active and careers_url is not null
+             and ats_platform not in ('greenhouse', 'lever', 'ashby', 'workable')
+           order by name"""
+    ).fetchall()
+    return [dict(id=r[0], name=r[1], careers_url=r[2]) for r in rows]
+
+
 def start_run(conn: psycopg.Connection, trigger: str):
     """Create the pipeline_runs row. Returns (run_id, started_at)."""
     return conn.execute(
