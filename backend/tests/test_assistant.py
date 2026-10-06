@@ -9,7 +9,8 @@ from unittest import mock
 import httpx
 
 from app import config, llm
-from app.assistant import build_messages, cited_numbers, fallback_answer, keyword_query, read_hints, topic
+from app.assistant import (Turn, build_messages, cited_numbers, clean_rewrite, fallback_answer, follow_up,
+                           keyword_query, market_block, read_hints, rewrite_messages, topic)
 from app.ratelimit import DailyBudget, PerKeyLimiter
 
 TEST_DB = os.getenv("TEST_DATABASE_URL")
@@ -45,6 +46,15 @@ class TestQuestionReading(unittest.TestCase):
         self.assertEqual(keyword_query("data analyst or ML internship in New Town"), "data or analyst or ml")
         self.assertEqual(keyword_query("show me jobs"), "")
 
+    def test_follow_up_keeps_earlier_topic_and_filters(self):
+        history = [Turn("Python jobs for freshers in Salt Lake", "Try [1].")]
+        text, hints = follow_up("what about salary?", history)
+        self.assertEqual(text, "Python jobs for freshers in Salt Lake what about salary?")
+        self.assertEqual((hints.areas, hints.fresher), (["Salt Lake"], True))
+        _, hints = follow_up("and in Howrah?", history)
+        self.assertEqual(hints.areas, ["Howrah"])                  # a new area replaces the old one
+        self.assertEqual(follow_up("sales jobs", [])[0], "sales jobs")
+
     def test_topic_used_for_meaning_search(self):
         self.assertEqual(topic("Which AI or machine learning jobs accept freshers?"),
                          "Which AI or machine learning jobs accept ?")
@@ -57,7 +67,8 @@ class TestPrompt(unittest.TestCase):
         msgs = build_messages("Python jobs for freshers?", [JOB], profile="ML Intern. Skills: python",
                               today=date(2026, 10, 3))
         system, user = msgs[0]["content"], msgs[1]["content"]
-        self.assertIn("ONLY the job posts", system)
+        self.assertIn("must come ONLY from <jobs> or <market>", system)
+        self.assertIn("general career advice", system)
         self.assertIn("Do not guess that freshers can apply", system)
         self.assertIn("2026-10-03", system)
         self.assertIn("[1] Python Developer | ABC (b)Tech(/b) | Salt Lake", user)
@@ -66,6 +77,41 @@ class TestPrompt(unittest.TestCase):
         self.assertEqual(user.count("</jobs>"), 1)            # a job can't close the <jobs> block early
         self.assertIn("About the user (from their CV): ML Intern", user)
         self.assertTrue(user.endswith("Question: Python jobs for freshers?"))
+
+    def test_market_block(self):
+        market = {"open_jobs": 1048, "freshers": 412, "median_pay": 340000.0,
+                  "areas": [("Kolkata", 612), ("Salt Lake", 240)], "skills": [("sales", 180), ("<b>excel", 169)]}
+        text = market_block(market)
+        self.assertIn("Current jobs: 1048 | open to freshers (0-1 year): 412", text)
+        self.assertIn("Rs 3.4 lakh per year", text)
+        self.assertIn("Kolkata 612, Salt Lake 240", text)
+        self.assertIn("(b)excel 169", text)                     # no angle brackets from data
+        self.assertIn("not enough data", market_block({**market, "median_pay": None}))
+        user = build_messages("How to prepare for interviews?", [], market=market)[1]["content"]
+        self.assertIn("(no matching jobs)", user)
+        self.assertIn("<market>\nCurrent jobs: 1048", user)
+
+    def test_history_goes_before_the_new_question(self):
+        history = [Turn(f"q{i}", f"a{i} <script>") for i in range(6)]
+        msgs = build_messages("and freshers?", [JOB], history=history)
+        self.assertEqual([m["role"] for m in msgs], ["system"] + ["user", "assistant"] * 4 + ["user"])
+        self.assertEqual((msgs[1]["content"], msgs[2]["content"]), ("q2", "a2 (script)"))   # last 4 turns only
+        self.assertIn("Earlier messages in this chat are context", msgs[0]["content"])
+        self.assertTrue(msgs[-1]["content"].endswith("Question: and freshers?"))
+
+    def test_rewrite_step(self):
+        history = [Turn("Python jobs for freshers?", "There are 3 [1] [2] [3].")]
+        msgs = rewrite_messages("what about Howrah?", history)
+        self.assertIn("ONE standalone question", msgs[0]["content"])
+        self.assertIn("User: Python jobs for freshers?", msgs[1]["content"])
+        self.assertTrue(msgs[1]["content"].endswith("Latest message: what about Howrah?"))
+        self.assertEqual(clean_rewrite('Question: "Python jobs for freshers in Howrah?"\nextra', "x?"),
+                         "Python jobs for freshers in Howrah?")
+        self.assertEqual(clean_rewrite("   ", "what about Howrah?"), "what about Howrah?")
+        user = build_messages("what about Howrah?", [], standalone="Python fresher jobs in Howrah?")[1]["content"]
+        self.assertTrue(user.endswith("(Meaning, from the chat so far: Python fresher jobs in Howrah?)"))
+        user = build_messages("Sales jobs?", [], standalone="sales jobs?")[1]["content"]
+        self.assertNotIn("Meaning", user)
 
     def test_citations(self):
         self.assertEqual(cited_numbers("See [2] and [1, 3]. Not [9].", 3), [1, 2, 3])
@@ -203,6 +249,34 @@ class TestAssistantApi(unittest.TestCase):
         self.assertIn("busy", body["note"])
         self.assertIn("Python Developer fresher", self.mine(body))
         self.assertIn("current jobs that best match", body["answer"])
+
+    def test_career_advice_even_without_matching_jobs(self):
+        seen = []
+        llm.set_client(fake_llm("Practise SQL questions and explain one project clearly.", seen=seen))
+        body = self.ask("How do I prepare for a data analyst interview?").json()
+        self.assertTrue(body["ai_written"])
+        self.assertIn("Practise SQL", body["answer"])
+        self.assertIn("<market>", seen[0]["messages"][1]["content"])
+
+    def test_follow_up_question(self):
+        seen = []
+        replies = iter(["Python developer jobs for freshers in Salt Lake?", "Yes, [1] is in Salt Lake."])
+
+        def handler(request):
+            seen.append(json.loads(request.content))
+            return httpx.Response(200, json={"choices": [{"message": {"content": next(replies)}}]})
+        llm.set_client(httpx.Client(transport=httpx.MockTransport(handler)))
+        body = self.ask("any in Salt Lake?", history=[
+            {"question": "python developer jobs for freshers", "answer": "There are some."}]).json()
+        self.assertTrue(body["ai_written"])
+        self.assertEqual(body["answer"], "Yes, [1] is in Salt Lake.")
+        self.assertEqual(self.mine(body), ["Python Developer fresher"])      # searched with the rewritten question
+        self.assertIn("Latest message: any in Salt Lake?", seen[0]["messages"][1]["content"])   # 1st call: rewrite
+        roles = [m["role"] for m in seen[1]["messages"]]                                       # 2nd call: answer
+        self.assertEqual(roles, ["system", "user", "assistant", "user"])
+        self.assertIn("(Meaning, from the chat so far: Python developer jobs for freshers in Salt Lake?)",
+                      seen[1]["messages"][-1]["content"])
+        self.assertEqual(self.ask("x y z", history=[{"question": "q", "answer": "a"}] * 11).status_code, 422)
 
     def test_validation_rate_limit_and_cv_login(self):
         from app.routers import assistant

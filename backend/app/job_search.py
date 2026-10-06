@@ -12,6 +12,8 @@ SORTS = ("relevance", "newest", "salary")
 AREAS = ("Kolkata", "Salt Lake", "New Town", "Howrah")
 JOB_TYPES = ("full_time", "part_time", "internship", "contract", "temporary")
 WORK_MODES = ("onsite", "hybrid", "remote")
+# job sites whose apply link goes through their own page; every other source links to the employer directly
+AGGREGATOR_SOURCES = ("adzuna", "jooble", "careerjet")
 
 _SUMMARY_FIELDS = ("id", "title", "company_name", "area", "location_raw", "salary_min", "salary_max",
                    "salary_period", "experience_min", "experience_max", "job_type", "work_mode", "skills",
@@ -42,6 +44,7 @@ class JobFiltersIn:
     work_modes: list[str] = field(default_factory=list)
     posted_within_days: Optional[int] = None
     seen_since: Optional[datetime] = None         # job alerts: only jobs we first saw after this time
+    direct_only: bool = False                     # only jobs that link straight to the employer
     sort: str = "relevance"
     page: int = 1
     page_size: int = 20
@@ -103,6 +106,10 @@ def build_search_query(f: JobFiltersIn) -> tuple[str, str, dict]:
         params["posted_within_days"] = f.posted_within_days
         where.append("coalesce(posted_at, first_seen_at) >= now() - make_interval(days => %(posted_within_days)s)")
 
+    if f.direct_only:
+        params["aggregators"] = list(AGGREGATOR_SOURCES)
+        where.append("source <> all(%(aggregators)s)")
+
     if f.seen_since:
         params["seen_since"] = f.seen_since
         where.append("first_seen_at > %(seen_since)s")
@@ -110,10 +117,14 @@ def build_search_query(f: JobFiltersIn) -> tuple[str, str, dict]:
     newest = "coalesce(posted_at, first_seen_at) desc"
     if f.sort == "salary":
         order = f"coalesce(salary_max, salary_min) desc nulls last, {newest}"
-    elif f.sort == "relevance" and rank_parts:
-        order = f"({' + '.join(rank_parts)}) desc, {newest}"
+    elif f.sort == "relevance":
+        # direct-apply jobs first (company boards, career pages, recruiters), then by match, then newest
+        params["aggregators"] = list(AGGREGATOR_SOURCES)
+        direct_first = "(source = any(%(aggregators)s))"
+        order = f"{direct_first}, ({' + '.join(rank_parts)}) desc, {newest}" if rank_parts else \
+            f"{direct_first}, {newest}"
     else:
-        order = newest                             # "newest", or relevance with nothing to rank by
+        order = newest
 
     params["limit"] = f.page_size
     params["offset"] = (f.page - 1) * f.page_size
