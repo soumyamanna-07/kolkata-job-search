@@ -11,8 +11,8 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config, db
-from app.routers import (admin, alerts, assistant, cv, employer, employer_stats, insights, jobs, match, me,
-                         reports)
+from app.routers import (admin, admin_companies, alerts, assistant, cv, employer, employer_stats, insights, jobs,
+                         match, me, reports)
 
 
 @asynccontextmanager
@@ -51,6 +51,7 @@ app.include_router(assistant.router)
 app.include_router(employer.router)
 app.include_router(employer_stats.router)
 app.include_router(admin.router)
+app.include_router(admin_companies.router)
 
 
 @app.get("/health", tags=["system"])
