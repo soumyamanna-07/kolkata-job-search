@@ -7,7 +7,7 @@ Run from the project root:
     python data_pipeline/run_pipeline.py               (full run, writes to the database)
 
 Options:
-    --sources lever,greenhouse,ashby,workable,career_page,adzuna   only run these sources
+    --sources lever,greenhouse,ashby,workable,career_page,adzuna,jooble,careerjet   only run these
     --adzuna-mode recent|full           recent = new jobs only (daily), full = all jobs + closing (weekly)
     --trigger schedule|manual           recorded in pipeline_runs (GitHub Actions uses schedule)
 """
@@ -17,12 +17,12 @@ import time
 import traceback
 
 from pipeline import config, store
-from pipeline.collectors import adzuna, ashby, career_page, greenhouse, lever, workable
+from pipeline.collectors import adzuna, ashby, career_page, careerjet, greenhouse, jooble, lever, workable
 from pipeline.collectors.base import CollectResult, make_session
 from pipeline.db import connect
 from pipeline.normalize import clean_job, deduplicate
 
-ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "adzuna")
+ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "adzuna", "jooble", "careerjet")
 # company job boards: platform name -> collector
 BOARD_COLLECTORS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby, "workable": workable}
 DELAY_BETWEEN_COMPANIES = 0.5   # seconds - be polite to job boards
@@ -55,6 +55,22 @@ def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "re
         r = adzuna.collect(session, config.ADZUNA_APP_ID, config.ADZUNA_APP_KEY, adzuna_mode)
         results.append(r)
         log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'SKIPPED/FAILED: ' + (r.error or '')}"
+            f"  ({r.requests_made} API calls)")
+    # aggregators that need a free key: skipped quietly until the key is in .env
+    aggregators = (
+        ("jooble", config.JOOBLE_API_KEY, lambda: jooble.collect(session, config.JOOBLE_API_KEY)),
+        ("careerjet", config.CAREERJET_API_KEY,
+         lambda: careerjet.collect(session, config.CAREERJET_API_KEY, config.CAREERJET_USER_IP)),
+    )
+    for name, key, run in aggregators:
+        if name not in sources:
+            continue
+        if not key:
+            log(f"  {name:<40}     -  skipped (no API key in .env yet)")
+            continue
+        r = run()
+        results.append(r)
+        log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}"
             f"  ({r.requests_made} API calls)")
     return results
 
