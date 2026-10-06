@@ -1,8 +1,8 @@
 """Dead-link checker: close open jobs whose apply link no longer works.
 
-Checks jobs that no source API keeps up to date (employer posts, later also submitted
-links). Adzuna / Greenhouse / Lever jobs are closed by the pipeline when they disappear
-from the source, so we do not crawl those sites.
+Checks jobs that no source API keeps up to date: recruiter posts and shared job links
+(campus = from college TPOs, community = from users). Adzuna / Greenhouse / Lever jobs
+are closed by the pipeline when they disappear from the source, so we do not crawl those.
 
 A job is closed only after 3 failed checks on different days, so a website that is
 down for an afternoon does not lose its jobs. "Blocked" answers (403, 429, 5xx,
@@ -25,7 +25,7 @@ from psycopg.rows import dict_row
 
 from app import config
 
-DEFAULT_SOURCES = ("employer",)
+DEFAULT_SOURCES = ("employer", "campus", "community")
 FAILS_TO_CLOSE = 3
 RECHECK_AFTER = timedelta(hours=20)
 MAX_PER_RUN = 300
