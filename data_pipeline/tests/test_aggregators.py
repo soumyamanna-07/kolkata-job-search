@@ -7,6 +7,7 @@ import requests
 
 from pipeline.collectors import careerjet, jooble
 from pipeline.collectors.salary_text import parse_salary
+from pipeline.normalize import clean_job
 
 NOW = datetime(2026, 10, 6, 12, 0, tzinfo=timezone.utc)
 
@@ -50,28 +51,53 @@ class TestJooble(unittest.TestCase):
         session.post.assert_not_called()
 
     @mock.patch.object(jooble.time, "sleep")
-    def test_pages_until_total(self, _sleep):
+    @mock.patch.object(jooble, "RESULTS_PER_PAGE", 2)
+    @mock.patch.object(jooble, "KEYWORDS", ["data", "sales"])
+    def test_keywords_pages_and_duplicates(self, _sleep):
         second = dict(self.ITEM, id=222, title="Sales Executive", salary="")
+        third = dict(self.ITEM, id=333, title="Sales Manager")
+        old = dict(self.ITEM, id=444, title="Old Job", updated="2026-08-01T09:30:00.0000000")
         session = mock.Mock()
-        session.post.side_effect = [fake_response({"totalCount": 2, "jobs": [self.ITEM]}),
-                                    fake_response({"totalCount": 2, "jobs": [second]})]
+        session.post.side_effect = [
+            fake_response({"totalCount": 3, "jobs": [self.ITEM, second]}),   # "data", page 1 (full page)
+            fake_response({"totalCount": 3, "jobs": [old]}),                 # "data", page 2 (last page)
+            fake_response({"totalCount": 2, "jobs": [second, third]}),       # "sales": 222 seen already
+        ]
         r = jooble.collect(session, "SECRETKEY", now=NOW)
         self.assertTrue(r.complete)
         self.assertFalse(r.snapshot)                          # search results never close jobs
-        self.assertEqual((len(r.jobs), r.requests_made), (2, 2))
+        self.assertEqual([j.source_job_id for j in r.jobs], ["111", "222", "333"])   # no duplicate, no old job
+        self.assertEqual(r.requests_made, 3)
         url, = session.post.call_args_list[0].args
-        body = session.post.call_args_list[0].kwargs["json"]
-        self.assertEqual(url, "https://jooble.org/api/SECRETKEY")
-        self.assertEqual((body["location"], body["page"], body["datecreatedfrom"]), ("Kolkata", "1", "2026-09-06"))
+        bodies = [c.kwargs["json"] for c in session.post.call_args_list]
+        self.assertEqual(url, "https://in.jooble.org/api/SECRETKEY")
+        self.assertEqual([(b["keywords"], b["page"]) for b in bodies], [("data", "1"), ("data", "2"), ("sales", "1")])
+        self.assertEqual(bodies[0]["location"], "Kolkata")
         job = r.jobs[0]
         self.assertEqual((job.source, job.source_job_id, job.company_name), ("jooble", "111", "ABC Tech"))
         self.assertEqual((job.salary_min, job.salary_max, job.salary_period), (25000, 35000, "month"))
         self.assertEqual(job.posted_at, datetime(2026, 10, 1, 9, 30, tzinfo=timezone.utc))
         self.assertIsNone(r.jobs[1].salary_min)
 
+    @mock.patch.object(jooble.time, "sleep")
+    @mock.patch.object(jooble, "MAX_REQUESTS", 2)
+    def test_request_limit(self, _sleep):
+        session = mock.Mock()
+        session.post.return_value = fake_response({"totalCount": 0, "jobs": []})
+        r = jooble.collect(session, "KEY", now=NOW)
+        self.assertEqual(session.post.call_count, 2)
+        self.assertTrue(r.complete)
+
+    def test_jooble_spellings_pass_kolkata_filter(self):
+        # Jooble India writes "Kolkatta" and "Saltlake"; both must count as Kolkata
+        for place, area in (("Kolkatta", "Kolkata"), ("Saltlake", "Salt Lake")):
+            job = clean_job(jooble._to_job(dict(self.ITEM, location=place)), now=NOW)
+            self.assertIsNotNone(job, place)
+            self.assertEqual(job.area, area)
+
     def test_error_hides_key(self):
         session = mock.Mock()
-        session.post.side_effect = requests.ConnectionError("failed: https://jooble.org/api/SECRETKEY")
+        session.post.side_effect = requests.ConnectionError("failed: https://in.jooble.org/api/SECRETKEY")
         r = jooble.collect(session, "SECRETKEY")
         self.assertFalse(r.complete)
         self.assertNotIn("SECRETKEY", r.error)

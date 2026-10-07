@@ -30,6 +30,7 @@ KOLKATA_AREAS: list[tuple[str, str]] = [
     ("rajarhat", "New Town"),
     ("howrah", "Howrah"),
     ("kolkata", "Kolkata"),
+    ("kolkatta", "Kolkata"),       # common misspelling (Jooble India uses it)
     ("calcutta", "Kolkata"),
 ]
 
