@@ -1,7 +1,8 @@
 // Admin: the numbers that matter at a glance, and what is waiting for a decision.
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AdminTabs from '../components/AdminTabs'
+import JobUpdatePanel from '../components/JobUpdatePanel'
 import { api } from '../lib/api'
 import { SOURCE_CREDITS } from '../lib/format'
 
@@ -29,7 +30,8 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null)
   const [error, setError] = useState('')
 
-  useEffect(() => { api('/api/admin/stats').then(setStats).catch((e) => setError(e.message)) }, [])
+  const load = useCallback(() => { api('/api/admin/stats').then(setStats).catch((e) => setError(e.message)) }, [])
+  useEffect(() => { load() }, [load])
 
   const sources = stats ? Object.entries(stats.open_jobs_by_source) : []
   const maxSource = Math.max(1, ...sources.map(([, c]) => c))
@@ -43,6 +45,8 @@ export default function AdminDashboardPage() {
 
       {stats && (
         <div className="space-y-6">
+          <JobUpdatePanel onFinished={load} />
+
           <section>
             <h2 className="font-display text-2xl mb-3">Waiting for you</h2>
             <div className="grid sm:grid-cols-3 gap-4">

@@ -265,7 +265,8 @@ def stats(admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = D
         open_jobs=one("select count(*) from public.jobs where status = 'open'"),
         open_jobs_by_source=dict(conn.execute("select source, count(*) from public.jobs where status = 'open' "
                                               "group by 1 order by 2 desc").fetchall()),
-        new_jobs_7_days=one("select count(*) from public.jobs where first_seen_at >= now() - interval '7 days'"),
+        new_jobs_7_days=one("select count(*) from public.jobs where status = 'open' "
+                            "and first_seen_at >= now() - interval '7 days'"),
         jobs_without_embedding=one("select count(*) from public.jobs where status = 'open' and embedding is null"),
         users_by_role=dict(conn.execute("select role, count(*) from public.profiles group by 1").fetchall()),
         blocked_users=one("select count(*) from public.profiles where is_blocked"),
