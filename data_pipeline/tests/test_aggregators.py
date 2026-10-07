@@ -217,22 +217,36 @@ class TestCareerjet(unittest.TestCase):
         self.assertEqual(session.get.call_count, 1)                                  # no second page needed
         kwargs = session.get.call_args.kwargs
         self.assertEqual(kwargs["auth"], ("SECRETKEY", ""))
-        self.assertEqual((kwargs["params"]["locale_code"], kwargs["params"]["location"], kwargs["params"]["page"],
-                          kwargs["params"]["user_ip"]), ("en_IN", "Kolkata", 1, "203.0.113.5"))
+        self.assertEqual(kwargs["headers"]["Referer"], "https://kolkata-live-jobs.vercel.app/")   # else 403
+        self.assertEqual((kwargs["params"]["locale_code"], kwargs["params"]["location"], kwargs["params"]["offset"],
+                          kwargs["params"]["user_ip"]), ("en_IN", "Kolkata", 0, "203.0.113.5"))
         self.assertEqual((r.jobs[0].salary_min, r.jobs[0].salary_period), (300000, "year"))
         self.assertEqual((r.jobs[1].salary_min, r.jobs[1].salary_period), (None, None))
         self.assertEqual(r.jobs[0].posted_at, datetime(2026, 10, 5, 8, 30, tzinfo=timezone.utc))
 
     @mock.patch.object(careerjet.time, "sleep")
-    def test_next_page_and_limit(self, _sleep):
-        full_page = {"type": "JOBS", "hits": 5000,
-                     "jobs": [self.item(i, "Mon, 05 Oct 2026 08:30:00 GMT") for i in range(careerjet.PAGE_SIZE)]}
+    def test_moves_on_with_offset_up_to_the_limit(self, _sleep):
+        # Careerjet sends 20 jobs per answer; we walk offset 0, 20, 40 ... up to its limit of 999
+        def answer(url, params=None, **kw):
+            start = params["offset"]
+            return fake_response({"type": "JOBS", "hits": 5000, "jobs": [
+                self.item(start + i, "Mon, 05 Oct 2026 08:30:00 GMT") for i in range(20)]})
         session = mock.Mock()
-        session.get.return_value = fake_response(full_page)
+        session.get.side_effect = answer
         r = careerjet.collect(session, "KEY", now=NOW)
-        self.assertEqual(session.get.call_count, careerjet.MAX_PAGES)
+        offsets = [c.kwargs["params"]["offset"] for c in session.get.call_args_list]
+        self.assertEqual(offsets[:3], [0, 20, 40])
+        self.assertEqual(offsets[-1], 980)                        # next would be 1000: past the API's limit
+        self.assertEqual(len(r.jobs), 1000)
         self.assertEqual(session.get.call_args.kwargs["params"]["user_ip"], "127.0.0.1")
         self.assertTrue(r.complete)
+
+    def test_stops_at_the_end_of_the_list(self):
+        session = mock.Mock()
+        session.get.return_value = fake_response({"type": "JOBS", "hits": 2, "jobs": [
+            self.item(1, "Mon, 05 Oct 2026 08:30:00 GMT"), self.item(2, "Mon, 05 Oct 2026 08:30:00 GMT")]})
+        r = careerjet.collect(session, "KEY", now=NOW)
+        self.assertEqual((session.get.call_count, len(r.jobs), r.complete), (1, 2, True))
 
     def test_wrong_location_answer(self):
         session = mock.Mock()
