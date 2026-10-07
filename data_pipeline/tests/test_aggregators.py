@@ -5,7 +5,7 @@ from unittest import mock
 
 import requests
 
-from pipeline.collectors import careerjet, jooble
+from pipeline.collectors import careerjet, jobicy, jooble
 from pipeline.collectors.salary_text import parse_salary
 from pipeline.normalize import clean_job
 
@@ -52,6 +52,7 @@ class TestJooble(unittest.TestCase):
 
     @mock.patch.object(jooble.time, "sleep")
     @mock.patch.object(jooble, "RESULTS_PER_PAGE", 2)
+    @mock.patch.object(jooble, "REMOTE_KEYWORDS", [])
     @mock.patch.object(jooble, "KEYWORDS", ["data", "sales"])
     def test_keywords_pages_and_duplicates(self, _sleep):
         second = dict(self.ITEM, id=222, title="Sales Executive", salary="")
@@ -95,13 +96,100 @@ class TestJooble(unittest.TestCase):
             self.assertIsNotNone(job, place)
             self.assertEqual(job.area, area)
 
-    def test_error_hides_key(self):
+    @mock.patch.object(jooble.time, "sleep")
+    @mock.patch.object(jooble, "REMOTE_KEYWORDS", [])
+    @mock.patch.object(jooble, "KEYWORDS", ["data", "sales"])
+    def test_server_error_is_tried_again(self, sleep):
+        session = mock.Mock()
+        session.post.side_effect = [fake_response({}, 500),                                  # "data" fails once
+                                    fake_response({"totalCount": 1, "jobs": [self.ITEM]}),   # ... then works
+                                    fake_response({"totalCount": 0, "jobs": []})]            # "sales"
+        r = jooble.collect(session, "KEY", now=NOW)
+        self.assertTrue(r.complete)
+        self.assertIsNone(r.error)
+        self.assertEqual([j.source_job_id for j in r.jobs], ["111"])
+        self.assertEqual(r.requests_made, 3)
+        sleep.assert_any_call(jooble.RETRY_WAITS[0])
+
+    @mock.patch.object(jooble.time, "sleep")
+    @mock.patch.object(jooble, "REMOTE_KEYWORDS", [])
+    @mock.patch.object(jooble, "KEYWORDS", ["data", "sales"])
+    def test_keyword_that_keeps_failing_is_skipped(self, _sleep):
+        session = mock.Mock()
+        session.post.side_effect = [fake_response({}, 500)] * 3 + [   # "data": first try + 2 retries
+            fake_response({"totalCount": 1, "jobs": [self.ITEM]})]    # "sales" still collected
+        r = jooble.collect(session, "SECRETKEY", now=NOW)
+        self.assertFalse(r.complete)                                  # partial: one search was skipped
+        self.assertEqual(len(r.jobs), 1)
+        self.assertIn("1 of 2 searches skipped: data", r.error)
+        self.assertNotIn("SECRETKEY", r.error)
+
+    @mock.patch.object(jooble.time, "sleep")
+    @mock.patch.object(jooble, "KEYWORDS", ["data"])
+    @mock.patch.object(jooble, "REMOTE_KEYWORDS", ["work from home"])
+    def test_work_from_home_search(self, _sleep):
+        wfh = dict(self.ITEM, id=555, title="Customer Support (Work From Home)", location="Bengaluru")
+        office = dict(self.ITEM, id=666, title="Office Assistant", location="Pune")
+        hybrid = dict(self.ITEM, id=777, title="Remote / Hybrid Analyst", location="Mumbai")
+        session = mock.Mock()
+        session.post.side_effect = [fake_response({"totalCount": 1, "jobs": [self.ITEM]}),          # Kolkata
+                                    fake_response({"totalCount": 3, "jobs": [wfh, office, hybrid]})]  # India WFH
+        r = jooble.collect(session, "KEY", now=NOW)
+        bodies = [c.kwargs["json"] for c in session.post.call_args_list]
+        self.assertEqual([(b["keywords"], b["location"]) for b in bodies],
+                         [("data", "Kolkata"), ("work from home", "India")])
+        self.assertEqual([(j.source_job_id, j.remote_from_india) for j in r.jobs], [("111", False), ("555", True)])
+        job = clean_job(r.jobs[1], now=NOW)
+        self.assertEqual((job.area, job.work_mode), ("Work from home", "remote"))
+
+    @mock.patch.object(jooble.time, "sleep")
+    def test_wrong_key_stops_without_retry(self, _sleep):
+        session = mock.Mock()
+        session.post.return_value = fake_response({}, 403)
+        r = jooble.collect(session, "KEY", now=NOW)
+        self.assertEqual(session.post.call_count, 1)
+        self.assertFalse(r.complete)
+        self.assertIn("403", r.error)
+
+    @mock.patch.object(jooble.time, "sleep")
+    def test_error_hides_key(self, _sleep):
         session = mock.Mock()
         session.post.side_effect = requests.ConnectionError("failed: https://in.jooble.org/api/SECRETKEY")
         r = jooble.collect(session, "SECRETKEY")
         self.assertFalse(r.complete)
         self.assertNotIn("SECRETKEY", r.error)
         self.assertIn("***", r.error)
+
+
+class TestJobicy(unittest.TestCase):
+    def item(self, n, geo, date="2026-10-03T10:00:00+00:00"):
+        return {"id": n, "url": f"https://jobicy.com/jobs/{n}-job", "jobTitle": f"Job {n}", "companyName": "Remote Co",
+                "jobGeo": geo, "jobType": ["Full-Time"], "jobDescription": "<p>Python and SQL</p>", "pubDate": date}
+
+    def test_keeps_jobs_open_to_india(self):
+        session = mock.Mock()
+        session.get.side_effect = [
+            fake_response({"jobs": [self.item(1, "Anywhere"), self.item(2, "USA"),
+                                    self.item(3, "Anywhere", date="2026-07-01T10:00:00+00:00")]}),   # too old
+            fake_response({"jobs": [self.item(4, "APAC"), self.item(5, "Hong Kong,  Singapore"),
+                                    self.item(1, "Anywhere")]}),                                       # 1 again
+        ]
+        r = jobicy.collect(session, now=NOW)
+        self.assertTrue(r.complete)
+        self.assertFalse(r.snapshot)
+        self.assertEqual([j.source_job_id for j in r.jobs], ["1", "4"])
+        self.assertEqual([c.kwargs["params"]["geo"] for c in session.get.call_args_list], ["anywhere", "apac"])
+        job = clean_job(r.jobs[0], now=NOW)
+        self.assertEqual((job.area, job.work_mode, job.job_type, job.source), ("Work from home", "remote",
+                                                                               "full_time", "jobicy"))
+        self.assertEqual(job.apply_url, "https://jobicy.com/jobs/1-job")      # Jobicy's own page (their rule)
+
+    def test_error(self):
+        session = mock.Mock()
+        session.get.return_value = fake_response({}, status=503)
+        r = jobicy.collect(session, now=NOW)
+        self.assertFalse(r.complete)
+        self.assertIn("503", r.error)
 
 
 class TestCareerjet(unittest.TestCase):

@@ -22,6 +22,8 @@ COMPANY_SUFFIXES = re.compile(
 )
 KOLKATA_WORDS = re.compile(r"(?<![a-z])(kolkata|calcutta|salt ?lake|bidhan ?nagar|sector v|sector 5|"
                            r"new ?town|rajarhat|howrah)(?![a-z])")
+# Salt Lake City is also a city in Utah, USA (same rule as data_pipeline/pipeline/normalize.py)
+ABROAD_WORDS = re.compile(r"(?<![a-z])(utah|usa|u\.s\.a?|united states)(?![a-z])|salt lake city,?\s*ut(?![a-z])")
 BOARD_URLS = {
     "greenhouse": "https://boards-api.greenhouse.io/v1/boards/{token}/jobs",
     "lever": "https://api.lever.co/v0/postings/{token}?mode=json",
@@ -31,6 +33,11 @@ BOARD_URLS = {
 NOT_FOUND = ("No job board with this code. Check the spelling: it is the part after boards.greenhouse.io/, "
              "jobs.lever.co/, jobs.ashbyhq.com/ or apply.workable.com/ in the careers link.")
 USER_AGENT = "KolkataLiveJobSearch/1.0 (+https://github.com/soumyamanna-07/kolkata-job-search)"
+
+
+def in_kolkata(location: str) -> bool:
+    text = (location or "").lower()
+    return bool(KOLKATA_WORDS.search(text)) and not ABROAD_WORDS.search(text)
 
 
 def normalize_company(name: str) -> str:
@@ -111,6 +118,6 @@ def check_board(client, platform: str, token: str) -> BoardCheck:
         return BoardCheck(ok=False, error="The job board sent something we could not read.")
     if platform == "workable" and not jobs and not data.get("name"):
         return BoardCheck(ok=False, error=NOT_FOUND)    # Workable says "OK, 0 jobs" even for unknown accounts
-    kolkata = [title for title, locs in jobs if any(KOLKATA_WORDS.search(loc.lower()) for loc in locs)]
+    kolkata = [title for title, locs in jobs if any(in_kolkata(loc) for loc in locs)]
     return BoardCheck(ok=True, jobs=len(jobs), kolkata_jobs=len(kolkata),
                       sample_titles=(kolkata or [title for title, _ in jobs])[:5])

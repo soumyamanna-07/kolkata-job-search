@@ -9,11 +9,11 @@ from datetime import datetime
 from typing import Optional
 
 SORTS = ("relevance", "newest", "salary")
-AREAS = ("Kolkata", "Salt Lake", "New Town", "Howrah")
+AREAS = ("Kolkata", "Salt Lake", "New Town", "Howrah", "Work from home")   # last one: remote jobs open to India
 JOB_TYPES = ("full_time", "part_time", "internship", "contract", "temporary")
 WORK_MODES = ("onsite", "hybrid", "remote")
 # job sites whose apply link goes through their own page; every other source links to the employer directly
-AGGREGATOR_SOURCES = ("adzuna", "jooble", "careerjet")
+AGGREGATOR_SOURCES = ("adzuna", "jooble", "careerjet", "jobicy")
 
 _SUMMARY_FIELDS = ("id", "title", "company_name", "area", "location_raw", "salary_min", "salary_max",
                    "salary_period", "experience_min", "experience_max", "job_type", "work_mode", "skills",

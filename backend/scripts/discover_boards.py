@@ -44,6 +44,24 @@ CANDIDATES = [
     ("Turing", "turing"), ("Toptal", "toptal"), ("Grant Thornton Bharat", "grantthorntonbharat"),
     ("Swiggy", "swiggy"), ("Zomato", "zomato"), ("Ola", "ola"), ("Acko", "acko"), ("Zetwerk", "zetwerk"),
     ("Pine Labs", "pinelabs"), ("Freshworks", "freshworks"), ("Juspay", "juspay"), ("Fyle", "fyle"),
+    # seen with Kolkata openings on these job boards (October 2026 web search)
+    ("Paytm Payments Services", "paytmpayments"), ("Weekday Works", "weekdayworks"), ("Weekday AI", "weekday-1"),
+    ("Welo Global", "weloglobal"), ("Smart Working Solutions", "smart-working-solutions"),
+    ("Stable Money", "stable-money1"), ("Sprinto", "sprinto"), ("HighLevel", "gohighlevel"), ("Egen", "egen"),
+    ("Lightcast", "economicmodeling"), ("Portcast", "portcast"), ("Jobgether", "jobgether"),
+    ("Speechify", "speechify"), ("Piston Technologies", "pistontechnologies"), ("WPP Media", "wppmedia"),
+    ("Capco", "capco"), ("Zenoti", "zenoti"), ("Zscaler", "zscaler"), ("Zafin", "zafinlabsamericasinc"),
+    ("Khan Academy", "khanacademy"), ("GoGuardian", "goguardian"), ("TechnologyAdvice", "technologyadvice"),
+    ("Trifecta Retail Ventures", "trv"), ("DHPL International", "dhpl-international-llc"), ("Kubicle", "kubicle"),
+    ("Qatalog", "qatalog"),
+    # companies with offices in Kolkata (guesses: boards that do not exist are skipped)
+    ("Indus Net Technologies", "indusnet"), ("Unified Infotech", "unifiedinfotech"), ("Webspiders", "webspiders"),
+    ("RS Software", "rssoftware"), ("mjunction", "mjunction"), ("SastaSundar", "sastasundar"),
+    ("Wow! Momo", "wowmomo"), ("Shyam Steel", "shyamsteel"), ("Lexmark", "lexmark"), ("Ericsson", "ericsson"),
+    ("Capgemini", "capgemini"), ("Genpact", "genpact"), ("Sutherland", "sutherland"), ("Concentrix", "concentrix"),
+    ("Teleperformance", "teleperformance"), ("Xpressbees", "xpressbees"), ("Shadowfax", "shadowfax"),
+    ("Ecom Express", "ecomexpress"), ("Blinkit", "blinkit"), ("Instamart", "instamart"), ("Bajaj Finserv", "bajajfinserv"),
+    ("Airtel", "airtel"), ("Jio", "jio"), ("Infinity Learn", "infinitylearn"), ("Aakash", "aakash"),
 ]
 
 

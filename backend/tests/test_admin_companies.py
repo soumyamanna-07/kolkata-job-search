@@ -66,6 +66,12 @@ class TestCompanyHelpers(unittest.TestCase):
         self.assertEqual((r.ok, r.jobs, r.kolkata_jobs), (True, 3, 2))
         self.assertEqual(r.sample_titles, ["Data Analyst", "Backend Engineer"])     # Kolkata jobs shown first
 
+    def test_salt_lake_city_usa_is_not_kolkata(self):
+        data = {"jobs": [{"title": "Tech Lead", "location": {"name": "Salt Lake City, UT, USA"}},
+                         {"title": "Tech Lead", "location": {"name": "Kolkata, India"}}]}
+        r = check_board(FakeClient({GH_URL.format("sp"): FakeResponse(200, data)}), "greenhouse", "sp")
+        self.assertEqual((r.jobs, r.kolkata_jobs), (2, 1))
+
     def test_lever_board(self):
         r = check_board(FakeClient({LV_URL.format("xyz"): FakeResponse(200, LEVER)}), "lever", "xyz")
         self.assertEqual((r.ok, r.jobs, r.kolkata_jobs, r.sample_titles), (True, 2, 1, ["ML Engineer"]))

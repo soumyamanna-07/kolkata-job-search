@@ -46,6 +46,7 @@ export const SOURCE_CREDITS = {
   adzuna: { name: 'Adzuna', text: 'Jobs by Adzuna', url: 'https://www.adzuna.in' },
   jooble: { name: 'Jooble', text: 'Jobs by Jooble', url: 'https://in.jooble.org' },
   careerjet: { name: 'Careerjet', text: 'Jobs by Careerjet', url: 'https://www.careerjet.co.in' },
+  jobicy: { name: 'Jobicy', text: 'Jobs by Jobicy', url: 'https://jobicy.com' },
 }
 
 // company job boards, career pages, recruiters and TPO links open the employer's own page

@@ -1,13 +1,14 @@
 """Run the data pipeline: collect -> Kolkata filter -> clean -> de-duplicate -> save -> close.
 
-Only CURRENT jobs are kept open: posted in the last 30 days (see normalize.MAX_JOB_AGE_DAYS).
+Only CURRENT jobs are kept open: posted in the last 60 days (see normalize.MAX_JOB_AGE_DAYS).
+Work-from-home jobs open to India (Jobicy, Jooble "work from home" searches) are kept too.
 
 Run from the project root:
     python data_pipeline/run_pipeline.py --dry-run     (collect and show results, write nothing)
     python data_pipeline/run_pipeline.py               (full run, writes to the database)
 
 Options:
-    --sources lever,greenhouse,ashby,workable,career_page,adzuna,jooble,careerjet   only run these
+    --sources lever,greenhouse,ashby,workable,career_page,adzuna,jooble,careerjet,jobicy   only run these
     --adzuna-mode recent|full           recent = new jobs only (daily), full = all jobs + closing (weekly)
     --trigger schedule|manual           recorded in pipeline_runs (GitHub Actions uses schedule)
 """
@@ -17,12 +18,13 @@ import time
 import traceback
 
 from pipeline import config, store
-from pipeline.collectors import adzuna, ashby, career_page, careerjet, greenhouse, jooble, lever, workable
+from pipeline.collectors import adzuna, ashby, career_page, careerjet, greenhouse, jobicy, jooble, lever, workable
 from pipeline.collectors.base import CollectResult, make_session
 from pipeline.db import connect
-from pipeline.normalize import clean_job, deduplicate
+from pipeline.normalize import REMOTE_AREA, clean_job, deduplicate
 
-ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "adzuna", "jooble", "careerjet")
+ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "adzuna", "jooble", "careerjet",
+               "jobicy")
 # company job boards: platform name -> collector
 BOARD_COLLECTORS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby, "workable": workable}
 DELAY_BETWEEN_COMPANIES = 0.5   # seconds - be polite to job boards
@@ -55,6 +57,11 @@ def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "re
         r = adzuna.collect(session, config.ADZUNA_APP_ID, config.ADZUNA_APP_KEY, adzuna_mode)
         results.append(r)
         log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'SKIPPED/FAILED: ' + (r.error or '')}"
+            f"  ({r.requests_made} API calls)")
+    if "jobicy" in sources:                     # remote jobs open to India; free, no key needed
+        r = jobicy.collect(session)
+        results.append(r)
+        log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}"
             f"  ({r.requests_made} API calls)")
     # aggregators that need a free key: skipped quietly until the key is in .env
     aggregators = (
@@ -117,11 +124,13 @@ def main() -> int:
             log("Collecting:")
             results = collect_all(companies, sources, args.adzuna_mode, pages)
             jobs, stats = process(results)
-            log(f"Total collected: {stats['total_collected']} -> Kolkata: {stats['kolkata_count']} "
+            log(f"Total collected: {stats['total_collected']} -> Kolkata or work from home: {stats['kolkata_count']} "
                 f"-> Unique: {stats['unique_count']}")
 
             if args.dry_run:
-                for job in jobs[:5]:
+                remote = [job for job in jobs if job.area == REMOTE_AREA]
+                log(f"Work from home jobs (open to India): {len(remote)}")
+                for job in remote[:3] + [job for job in jobs if job.area != REMOTE_AREA][:3]:
                     salary = f"Rs {job.salary_min:,}-{job.salary_max or 0:,}" if job.salary_min else "Not disclosed"
                     log(f"  - {job.title} | {job.company_name} | {job.area} | {salary} | "
                         f"skills: {', '.join(job.skills[:6]) or '-'}")
@@ -131,7 +140,7 @@ def main() -> int:
             with conn.transaction():
                 stats["jobs_new"], stats["jobs_updated"] = store.save_jobs(conn, jobs)
                 stats["jobs_closed"], warnings = store.close_missing(conn, results, started_at)
-                expired = store.close_expired(conn)          # older than 30 days = not current
+                expired = store.close_expired(conn)          # older than 60 days = not current
                 stats["jobs_closed"] += expired
             log(f"Closed because older than {store.MAX_JOB_AGE_DAYS} days: {expired}")
             for w in warnings:

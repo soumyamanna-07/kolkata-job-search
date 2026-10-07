@@ -44,6 +44,8 @@ class TestPipelineEndToEnd(unittest.TestCase):
             resp.raise_for_status.return_value = None
             if "lever" in url:
                 resp.json.return_value = lever_payload
+            elif "jobicy" in url:
+                resp.json.return_value = {"jobs": []}
             else:
                 if not adzuna_ok:
                     raise base.requests.ConnectionError("down")

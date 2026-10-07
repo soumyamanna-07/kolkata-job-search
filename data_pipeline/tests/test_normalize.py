@@ -35,8 +35,23 @@ class TestArea(unittest.TestCase):
         self.assertIsNone(find_area(["Remote, India"]))
         self.assertIsNone(find_area([]))
 
+    def test_salt_lake_city_usa_is_not_kolkata(self):
+        self.assertIsNone(find_area(["Salt Lake City, UT, USA"]))
+        self.assertIsNone(find_area(["Salt Lake City, Utah"]))
+        self.assertEqual(find_area(["Salt Lake City, West Bengal"]), "Salt Lake")
+        self.assertEqual(find_area(["Salt Lake City, UT, USA", "Kolkata, India"]), "Kolkata")
+
     def test_any_of_many_locations(self):
         self.assertEqual(find_area(["Pune", "Kolkata"]), "Kolkata")
+
+    def test_work_from_home_jobs(self):
+        # a remote job open to India is kept even though it is not in Kolkata
+        job = clean_job(raw(locations=["Bengaluru, Karnataka"], remote_from_india=True), now=NOW)
+        self.assertEqual((job.area, job.work_mode), ("Work from home", "remote"))
+        # a remote job that is ALSO in Kolkata keeps its Kolkata area
+        self.assertEqual(clean_job(raw(remote_from_india=True), now=NOW).area, "Kolkata")
+        # an ordinary job outside Kolkata is still dropped
+        self.assertIsNone(clean_job(raw(locations=["Bengaluru, Karnataka"]), now=NOW))
 
 
 class TestText(unittest.TestCase):
