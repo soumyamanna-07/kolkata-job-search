@@ -8,6 +8,8 @@ import AdminCompaniesPage from './pages/AdminCompaniesPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import AdminReportsPage from './pages/AdminReportsPage'
 import AdminReviewPage from './pages/AdminReviewPage'
+import AdminSystemPage from './pages/AdminSystemPage'
+import AdminUsersPage from './pages/AdminUsersPage'
 import AlertsPage from './pages/AlertsPage'
 import AskPage from './pages/AskPage'
 import EmployerJobsPage from './pages/EmployerJobsPage'
@@ -50,6 +52,8 @@ export default function App() {
         <Route path="/admin/review" element={<RequireAdmin><AdminReviewPage /></RequireAdmin>} />
         <Route path="/admin/reports" element={<RequireAdmin><AdminReportsPage /></RequireAdmin>} />
         <Route path="/admin/companies" element={<RequireAdmin><AdminCompaniesPage /></RequireAdmin>} />
+        <Route path="/admin/users" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
+        <Route path="/admin/system" element={<RequireAdmin><AdminSystemPage /></RequireAdmin>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
