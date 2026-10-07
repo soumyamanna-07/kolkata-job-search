@@ -14,8 +14,8 @@ const LINKS = [
 ]
 
 function navClass({ isActive }) {
-  return `inline-flex items-center gap-2 px-3 py-2 rounded text-sm whitespace-nowrap ${
-    isActive ? 'text-white bg-white/12' : 'text-steel hover:text-white hover:bg-white/5'}`
+  return `inline-flex items-center gap-2 px-3 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
+    isActive ? 'text-white bg-white/12 ring-1 ring-white/15' : 'text-steel hover:text-white hover:bg-white/8'}`
 }
 
 export default function Layout() {
@@ -37,10 +37,10 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:p-2 focus:bg-white">Skip to content</a>
-      <header className="bg-dusk text-white sticky top-0 z-30 border-b border-white/10">
+      <header className="header-glass text-white sticky top-0 z-30 border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2 whitespace-nowrap">
-            <svg viewBox="0 0 32 32" className="w-8 h-8" aria-hidden="true">
+            <svg viewBox="0 0 32 32" className="logo-glow w-8 h-8" aria-hidden="true">
               <rect width="32" height="32" rx="6" fill="#f4c430" />
               <path d="M5 22h22M9 22V9M23 22V9M9 9l7 7l7-7M9 14l14 0" stroke="#17324a" strokeWidth="2.2" fill="none"
                     strokeLinecap="round" strokeLinejoin="round" />
@@ -57,7 +57,7 @@ export default function Layout() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2 text-sm">
-            <button onClick={toggle} className="p-2 rounded text-steel hover:text-taxi hover:bg-white/10"
+            <button onClick={toggle} className="p-2 rounded-full text-steel hover:text-taxi hover:bg-white/10"
                     aria-label={theme === 'dark' ? 'Switch to light display' : 'Switch to dark display'}
                     title={theme === 'dark' ? 'Light display' : 'Dark display'}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
@@ -67,16 +67,16 @@ export default function Layout() {
                 <span className="hidden md:inline-flex xl:hidden 2xl:inline-flex items-center gap-1.5 text-steel max-w-44 truncate">
                   <Icon name="user" className="w-4 h-4" />{profile?.full_name || user.email}
                 </span>
-                <button onClick={signOut} className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-white/30 hover:bg-white/10 whitespace-nowrap">
+                <button onClick={signOut} className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/25 hover:bg-white/10 whitespace-nowrap">
                   <Icon name="logout" className="w-4 h-4" /> Log out
                 </button>
               </>
             ) : (
-              <Link to="/login" className="px-4 py-2 rounded bg-taxi text-ink font-semibold hover:bg-taxi-deep">
+              <Link to="/login" className="btn-taxi px-4 py-2 rounded-full font-semibold whitespace-nowrap">
                 Log in
               </Link>
             )}
-            <button className="xl:hidden p-2 rounded hover:bg-white/10" onClick={() => setMenu(!menu)}
+            <button className="xl:hidden p-2 rounded-full hover:bg-white/10" onClick={() => setMenu(!menu)}
                     aria-expanded={menu} aria-label="Menu">
               <Icon name={menu ? 'close' : 'menu'} />
             </button>
@@ -103,7 +103,7 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="bg-dusk-deep text-steel">
+      <footer className="footer-night text-steel">
         <div className="laal-paar" />
         <div className="max-w-6xl mx-auto px-4 py-8 grid gap-6 sm:grid-cols-3 text-sm">
           <div>
