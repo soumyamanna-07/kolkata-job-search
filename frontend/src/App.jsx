@@ -5,6 +5,7 @@ import RequireEmployer from './components/RequireEmployer'
 import RequireLogin from './components/RequireLogin'
 import AlertsPage from './pages/AlertsPage'
 import AskPage from './pages/AskPage'
+import EmployerJobsPage from './pages/EmployerJobsPage'
 import EmployerPostPage from './pages/EmployerPostPage'
 import EmployerProfilePage from './pages/EmployerProfilePage'
 import InsightsPage from './pages/InsightsPage'
@@ -38,6 +39,8 @@ export default function App() {
         <Route path="/share-job" element={<RequireLogin what="the share-a-job form"><ShareJobPage /></RequireLogin>} />
         <Route path="/employer" element={<RequireEmployer><EmployerProfilePage /></RequireEmployer>} />
         <Route path="/employer/post" element={<RequireEmployer><EmployerPostPage /></RequireEmployer>} />
+        <Route path="/employer/jobs" element={<RequireEmployer><EmployerJobsPage /></RequireEmployer>} />
+        <Route path="/employer/jobs/:id/edit" element={<RequireEmployer><EmployerPostPage /></RequireEmployer>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>

@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom'
 const TABS = [
   ['/employer', 'Company details'],
   ['/employer/post', 'Post a job'],
+  ['/employer/jobs', 'My jobs'],
 ]
 
 export default function EmployerTabs() {
