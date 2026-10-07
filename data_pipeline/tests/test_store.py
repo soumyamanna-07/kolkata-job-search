@@ -35,17 +35,19 @@ class TestPipelineEndToEnd(unittest.TestCase):
              "description": "short", "salary_min": 500000, "salary_max": 700000, "salary_is_predicted": "0"}
             for t in titles]}
 
-    def run_pipeline(self, lever_payload, adzuna_payload, adzuna_ok=True, adzuna_mode="recent"):
+    def run_pipeline(self, lever_payload, adzuna_payload, adzuna_ok=True, adzuna_mode="recent", gov_page=""):
         import run_pipeline
         from pipeline.collectors import base
 
-        def fake_get(url, params=None, timeout=None):
+        def fake_get(url, params=None, timeout=None, headers=None):
             resp = mock.Mock()
             resp.raise_for_status.return_value = None
             if "lever" in url:
                 resp.json.return_value = lever_payload
             elif "jobicy" in url:
                 resp.json.return_value = {"jobs": []}
+            elif "gov.example.in" in url:
+                resp.status_code, resp.text = 200, "" if url.endswith("/robots.txt") else gov_page
             else:
                 if not adzuna_ok:
                     raise base.requests.ConnectionError("down")
@@ -58,6 +60,7 @@ class TestPipelineEndToEnd(unittest.TestCase):
         env = {"DATABASE_URL": TEST_DB}
         with mock.patch.dict(os.environ, env), \
              mock.patch.object(run_pipeline, "make_session", return_value=session), \
+             mock.patch.object(run_pipeline.government, "make_session", return_value=session), \
              mock.patch.object(run_pipeline.config, "ADZUNA_APP_ID", "id"), \
              mock.patch.object(run_pipeline.config, "ADZUNA_APP_KEY", "key"), \
              mock.patch.object(run_pipeline, "DELAY_BETWEEN_COMPANIES", 0), \
@@ -119,6 +122,22 @@ class TestPipelineEndToEnd(unittest.TestCase):
         self.assertEqual(open_count, 6)                      # nothing closed
         msg = self.conn.execute("select error_message from public.pipeline_runs order by id desc limit 1").fetchone()[0]
         self.assertIn("not closing", msg)
+
+    def test_government_notice_saved_then_closed_after_last_date(self):
+        from datetime import date, timedelta
+        self.conn.execute(
+            "insert into public.companies (name, normalized_name, ats_platform, careers_url) "
+            "values ('IIEST Shibpur Howrah', 'iiest shibpur howrah', 'government', 'https://gov.example.in/jobs')")
+        last = (date.today() + timedelta(days=10)).strftime("%d.%m.%Y")
+        page = (f'<table><tr><td>Recruitment of Junior Technical Assistant</td><td>{last}</td>'
+                f'<td><a href="/jta.pdf">Download</a></td></tr></table>')
+        self.run_pipeline([], self.adzuna_page(), gov_page=page)
+        rows = self.conn.execute("select title, source, area, status, apply_url from public.jobs").fetchall()
+        self.assertEqual(rows, [("Recruitment of Junior Technical Assistant", "government", "Howrah", "open",
+                                 "https://gov.example.in/jta.pdf")])
+        # the office takes the notice down (or its last date passes): closed on the next run
+        self.run_pipeline([], self.adzuna_page(), gov_page="<table></table>")
+        self.assertEqual(self.conn.execute("select status from public.jobs").fetchone()[0], "closed")
 
     def test_jobs_older_than_60_days_are_closed(self):
         from pipeline import store

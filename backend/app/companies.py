@@ -13,7 +13,7 @@ from urllib.parse import quote
 import httpx
 
 PLATFORMS = ("greenhouse", "lever", "ashby", "smartrecruiters", "workable",
-             "zoho_recruit", "freshteam", "keka", "darwinbox", "other")
+             "zoho_recruit", "freshteam", "keka", "darwinbox", "government", "other")
 COLLECTED_PLATFORMS = ("greenhouse", "lever", "ashby", "workable")   # the pipeline collects these today
 TOKEN_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$"   # board code: letters, digits, - _ .
 

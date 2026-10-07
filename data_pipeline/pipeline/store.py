@@ -96,7 +96,17 @@ def load_career_pages(conn: psycopg.Connection) -> list[dict]:
     rows = conn.execute(
         """select id::text, name, careers_url from public.companies
            where is_active and careers_url is not null
-             and ats_platform not in ('greenhouse', 'lever', 'ashby', 'workable')
+             and ats_platform not in ('greenhouse', 'lever', 'ashby', 'workable', 'government')
+           order by name"""
+    ).fetchall()
+    return [dict(id=r[0], name=r[1], careers_url=r[2]) for r in rows]
+
+
+def load_government_pages(conn: psycopg.Connection) -> list[dict]:
+    """Active government offices whose official recruitment page is read for current notices."""
+    rows = conn.execute(
+        """select id::text, name, careers_url from public.companies
+           where is_active and careers_url is not null and ats_platform = 'government'
            order by name"""
     ).fetchall()
     return [dict(id=r[0], name=r[1], careers_url=r[2]) for r in rows]
@@ -156,7 +166,8 @@ def close_missing(conn: psycopg.Connection, results: list[CollectResult], run_st
         if not r.complete or not r.snapshot:
             continue                                # never close on partial, failed or "recent only" data
         open_now = conn.execute(COUNT_OPEN_SQL, (r.source, r.company_id)).fetchone()[0]
-        if not r.jobs and open_now >= SUSPICIOUS_EMPTY_THRESHOLD:
+        # a government page with no current notice is normal (every last date has passed), so it is not suspicious
+        if not r.jobs and open_now >= SUSPICIOUS_EMPTY_THRESHOLD and r.source != "government":
             warnings.append(f"{r.scope}: returned 0 jobs but {open_now} are open - not closing (check source)")
             continue
         closed += len(conn.execute(CLOSE_SQL, (r.source, r.company_id, run_started_at)).fetchall())

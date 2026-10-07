@@ -3,7 +3,8 @@
 Add a company with its Greenhouse / Lever / Ashby / Workable board code, and the next pipeline run
 collects its Kolkata jobs directly (better quality than aggregators). Check the board code first
 with POST /api/admin/companies/check-board. Any other company with a careers_url is read by the
-career-page reader (Google-Jobs tags). Every change is written to the audit log.
+career-page reader (Google-Jobs tags); a "government" office's careers_url is its official recruitment
+page, read daily for current notices. Every change is written to the audit log.
 """
 from datetime import datetime
 from typing import Literal, Optional
@@ -21,7 +22,7 @@ from app.routers.admin import _log, admin_only
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 Platform = Literal["greenhouse", "lever", "ashby", "smartrecruiters", "workable",
-                   "zoho_recruit", "freshteam", "keka", "darwinbox", "other"]
+                   "zoho_recruit", "freshteam", "keka", "darwinbox", "government", "other"]
 
 
 class CompanyIn(BaseModel):
@@ -39,6 +40,8 @@ class CompanyIn(BaseModel):
         self.name = self.name.strip()
         if self.ats_platform in companies.COLLECTED_PLATFORMS and not self.ats_token:
             raise ValueError(f"add the {self.ats_platform} board code (ats_token), or the pipeline can't collect it")
+        if self.ats_platform == "government" and not self.careers_url:
+            raise ValueError("add the office's official recruitment page (careers_url)")
         return self
 
 

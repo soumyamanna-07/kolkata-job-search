@@ -3,7 +3,7 @@
 Run from the project root:  python data_pipeline/seed_companies.py
 
 CSV columns: name, website, careers_url, ats_platform, ats_token, notes
-  ats_platform: greenhouse | lever | ashby | smartrecruiters | workable |
+  ats_platform: greenhouse | lever | ashby | smartrecruiters | workable | government |
                 zoho_recruit | freshteam | keka | darwinbox | other
   ats_token:    the company's code on that platform (see docs in README)
 Running it again is safe: existing companies are updated, not duplicated.
@@ -15,7 +15,7 @@ from pipeline.db import connect
 from pipeline.normalize import normalize_company
 
 CSV_PATH = Path(__file__).resolve().parent / "companies.csv"
-PLATFORMS = {"greenhouse", "lever", "ashby", "smartrecruiters", "workable",
+PLATFORMS = {"greenhouse", "lever", "ashby", "smartrecruiters", "workable", "government",
              "zoho_recruit", "freshteam", "keka", "darwinbox", "other"}
 
 UPSERT_SQL = """

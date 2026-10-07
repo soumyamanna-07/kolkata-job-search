@@ -11,7 +11,7 @@ const BOARDS = { greenhouse: 'boards.greenhouse.io/CODE', lever: 'jobs.lever.co/
   workable: 'apply.workable.com/CODE' }
 const PLATFORMS = { greenhouse: 'Greenhouse', lever: 'Lever', ashby: 'Ashby', workable: 'Workable',
   smartrecruiters: 'SmartRecruiters', zoho_recruit: 'Zoho Recruit', freshteam: 'Freshteam', keka: 'Keka',
-  darwinbox: 'Darwinbox', other: 'Other / own careers page' }
+  darwinbox: 'Darwinbox', government: 'Government recruitment page', other: 'Other / own careers page' }
 const EMPTY = { name: '', website: '', careers_url: '', ats_platform: 'other', ats_token: '', notes: '', is_active: true }
 const input = 'mt-1 w-full rounded border border-gray-300 px-3 py-2'
 
@@ -81,10 +81,15 @@ function CompanyForm({ company, onSaved, onCancel }) {
             <span className="block mt-1 text-xs text-gray-500">The CODE part of {board}</span>
           </label>
         ) : (
-          <label className="block">Careers page (optional)
-            <input type="url" maxLength={500} placeholder="https://company.com/careers" value={form.careers_url}
-                   onChange={update('careers_url')} className={input} />
-            <span className="block mt-1 text-xs text-gray-500">Read daily if it tags jobs for Google Jobs.</span>
+          <label className="block">{form.ats_platform === 'government' ? 'Official recruitment page' : 'Careers page (optional)'}
+            <input type="url" maxLength={500} required={form.ats_platform === 'government'}
+                   placeholder={form.ats_platform === 'government' ? 'https://office.gov.in/recruitment' : 'https://company.com/careers'}
+                   value={form.careers_url} onChange={update('careers_url')} className={input} />
+            <span className="block mt-1 text-xs text-gray-500">
+              {form.ats_platform === 'government'
+                ? 'Read daily: current recruitment notices (with a last date) are shown as Government jobs.'
+                : 'Read daily if it tags jobs for Google Jobs.'}
+            </span>
           </label>
         )}
       </div>

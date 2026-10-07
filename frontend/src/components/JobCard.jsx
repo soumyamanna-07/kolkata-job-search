@@ -16,6 +16,15 @@ export function DirectBadge() {
   )
 }
 
+export function GovernmentBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-hooghly text-white text-xs font-semibold"
+          title="Official notice from a government office or institute">
+      <Icon name="flag" className="w-3.5 h-3.5" /> Government
+    </span>
+  )
+}
+
 export function facts(job) {
   return [
     salaryText(job),
@@ -59,6 +68,7 @@ export default function JobCard({ job, extra, badge, number }) {
         </div>
 
         <p className="mt-2 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
+          {job.source === 'government' && <GovernmentBadge />}
           {isDirect(job) && <DirectBadge />}
           {facts(job).map((fact, i) => (
             <span key={fact} className={i === 0 && hasSalary ? 'font-semibold text-money' : 'text-gray-600'}>{fact}</span>

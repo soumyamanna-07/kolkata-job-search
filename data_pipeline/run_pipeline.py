@@ -2,13 +2,14 @@
 
 Only CURRENT jobs are kept open: posted in the last 60 days (see normalize.MAX_JOB_AGE_DAYS).
 Work-from-home jobs open to India (Jobicy, Jooble "work from home" searches) are kept too.
+Government recruitment notices are read from official pages (Company List, platform "government").
 
 Run from the project root:
     python data_pipeline/run_pipeline.py --dry-run     (collect and show results, write nothing)
     python data_pipeline/run_pipeline.py               (full run, writes to the database)
 
 Options:
-    --sources lever,greenhouse,ashby,workable,career_page,adzuna,jooble,careerjet,jobicy   only run these
+    --sources lever,greenhouse,ashby,workable,career_page,government,adzuna,jooble,careerjet,jobicy
     --adzuna-mode recent|full           recent = new jobs only (daily), full = all jobs + closing (weekly)
     --trigger schedule|manual           recorded in pipeline_runs (GitHub Actions uses schedule)
 """
@@ -18,13 +19,14 @@ import time
 import traceback
 
 from pipeline import config, store
-from pipeline.collectors import adzuna, ashby, career_page, careerjet, greenhouse, jobicy, jooble, lever, workable
+from pipeline.collectors import (adzuna, ashby, career_page, careerjet, government, greenhouse, jobicy, jooble,
+                                 lever, workable)
 from pipeline.collectors.base import CollectResult, make_session
 from pipeline.db import connect
 from pipeline.normalize import REMOTE_AREA, clean_job, deduplicate
 
-ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "adzuna", "jooble", "careerjet",
-               "jobicy")
+ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "government", "adzuna", "jooble",
+               "careerjet", "jobicy")
 # company job boards: platform name -> collector
 BOARD_COLLECTORS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby, "workable": workable}
 DELAY_BETWEEN_COMPANIES = 0.5   # seconds - be polite to job boards
@@ -35,7 +37,7 @@ def log(message: str) -> None:
 
 
 def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "recent",
-                career_pages: list[dict] = ()) -> list[CollectResult]:
+                career_pages: list[dict] = (), government_pages: list[dict] = ()) -> list[CollectResult]:
     session = make_session()
     results = []
     for company in companies:
@@ -50,6 +52,13 @@ def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "re
     if "career_page" in sources:
         for company in career_pages:
             r = career_page.collect(session, company["careers_url"], company["name"], company["id"])
+            results.append(r)
+            log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
+            time.sleep(DELAY_BETWEEN_COMPANIES)
+    if "government" in sources and government_pages:
+        gov_session = government.make_session()       # accepts old government web servers, still checks certificates
+        for office in government_pages:
+            r = government.collect(gov_session, office["careers_url"], office["name"], office["id"])
             results.append(r)
             log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
             time.sleep(DELAY_BETWEEN_COMPANIES)
@@ -113,7 +122,9 @@ def main() -> int:
         conn.autocommit = True
         companies = store.load_companies(conn)
         pages = store.load_career_pages(conn)
-        log(f"Companies with a job board: {len(companies)} | with a careers page to read: {len(pages)}")
+        gov_pages = store.load_government_pages(conn)
+        log(f"Companies with a job board: {len(companies)} | with a careers page to read: {len(pages)} | "
+            f"government recruitment pages: {len(gov_pages)}")
 
         run_id = started_at = None
         if not args.dry_run:
@@ -122,7 +133,7 @@ def main() -> int:
 
         try:
             log("Collecting:")
-            results = collect_all(companies, sources, args.adzuna_mode, pages)
+            results = collect_all(companies, sources, args.adzuna_mode, pages, gov_pages)
             jobs, stats = process(results)
             log(f"Total collected: {stats['total_collected']} -> Kolkata or work from home: {stats['kolkata_count']} "
                 f"-> Unique: {stats['unique_count']}")
