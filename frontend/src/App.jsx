@@ -1,8 +1,11 @@
 // All pages of the web app.
 import { Link, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
+import RequireAdmin from './components/RequireAdmin'
 import RequireEmployer from './components/RequireEmployer'
 import RequireLogin from './components/RequireLogin'
+import AdminDashboardPage from './pages/AdminDashboardPage'
+import AdminReviewPage from './pages/AdminReviewPage'
 import AlertsPage from './pages/AlertsPage'
 import AskPage from './pages/AskPage'
 import EmployerJobsPage from './pages/EmployerJobsPage'
@@ -41,6 +44,8 @@ export default function App() {
         <Route path="/employer/post" element={<RequireEmployer><EmployerPostPage /></RequireEmployer>} />
         <Route path="/employer/jobs" element={<RequireEmployer><EmployerJobsPage /></RequireEmployer>} />
         <Route path="/employer/jobs/:id/edit" element={<RequireEmployer><EmployerPostPage /></RequireEmployer>} />
+        <Route path="/admin" element={<RequireAdmin><AdminDashboardPage /></RequireAdmin>} />
+        <Route path="/admin/review" element={<RequireAdmin><AdminReviewPage /></RequireAdmin>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>

@@ -27,9 +27,10 @@ export default function Layout() {
 
   useEffect(() => setMenu(false), [location.pathname])           // close the phone menu after navigating
 
-  // recruiters get their own area instead of the job seeker links
+  // recruiters and admins get their own area instead of the job seeker links
   const userLinks = !user ? []
     : profile?.role === 'employer' ? [['/employer', 'Recruiter area', 'briefcase']]
+      : profile?.role === 'admin' ? [['/admin', 'Admin panel', 'flag']]
       : [['/saved', `Saved${count ? ` (${count})` : ''}`, 'bookmark'],
         ['/alerts', 'Alerts', 'bell'], ['/share-job', 'Share a job', 'link']]
 
