@@ -5,6 +5,7 @@ const TABS = [
   ['/admin', 'Dashboard'],
   ['/admin/review', 'Review recruiters and jobs'],
   ['/admin/reports', 'Reports and shared links'],
+  ['/admin/companies', 'Companies'],
 ]
 
 export default function AdminTabs() {

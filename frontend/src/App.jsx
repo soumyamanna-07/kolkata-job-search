@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import RequireAdmin from './components/RequireAdmin'
 import RequireEmployer from './components/RequireEmployer'
 import RequireLogin from './components/RequireLogin'
+import AdminCompaniesPage from './pages/AdminCompaniesPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import AdminReportsPage from './pages/AdminReportsPage'
 import AdminReviewPage from './pages/AdminReviewPage'
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/admin" element={<RequireAdmin><AdminDashboardPage /></RequireAdmin>} />
         <Route path="/admin/review" element={<RequireAdmin><AdminReviewPage /></RequireAdmin>} />
         <Route path="/admin/reports" element={<RequireAdmin><AdminReportsPage /></RequireAdmin>} />
+        <Route path="/admin/companies" element={<RequireAdmin><AdminCompaniesPage /></RequireAdmin>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
