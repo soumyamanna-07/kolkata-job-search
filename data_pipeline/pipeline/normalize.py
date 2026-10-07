@@ -13,9 +13,10 @@ from pipeline.models import CleanJob, RawJob
 from pipeline.skills import SKILLS
 
 MAX_DESCRIPTION_CHARS = 20000
-# A job is "current" only if it was posted in the last 30 days. Older posts are not
-# shown, even if a job board still lists them (store.close_expired closes them).
-MAX_JOB_AGE_DAYS = 30
+# A job is "live" only if it is still listed by its source AND was posted in the last 60 days.
+# Older posts are not shown, even if a job board still lists them (store.close_expired closes
+# them). On the site, people can narrow this down further (last 7, 15, 30, 40, 50 days ...).
+MAX_JOB_AGE_DAYS = 60
 
 # word in a location -> our standard area name (checked in this order)
 KOLKATA_AREAS: list[tuple[str, str]] = [

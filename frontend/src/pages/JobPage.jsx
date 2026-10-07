@@ -30,7 +30,7 @@ export default function JobPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
         <p className="text-gray-700">{error}</p>
-        <Link to="/" className="inline-block mt-3 text-dusk underline">See all current jobs</Link>
+        <Link to="/" className="inline-block mt-3 text-dusk underline">See all live jobs</Link>
       </div>
     )
   }

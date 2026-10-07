@@ -1,4 +1,4 @@
-// Home page: search current Kolkata jobs. Filters live in the URL, so a search can be shared or bookmarked.
+// Home page: search live Kolkata jobs. Filters live in the URL, so a search can be shared or bookmarked.
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import AlertButton from '../components/AlertButton'
@@ -14,7 +14,9 @@ const SALARY_OPTIONS = [
   ['', 'Any salary'], ['200000', '2 LPA or more'], ['300000', '3 LPA or more'], ['500000', '5 LPA or more'],
   ['800000', '8 LPA or more'], ['1200000', '12 LPA or more'],
 ]
-const POSTED_OPTIONS = [['', 'Last 30 days'], ['1', 'Last 24 hours'], ['3', 'Last 3 days'], ['7', 'Last 7 days']]
+// a job is live for up to 60 days (still listed by its source); people can narrow that down here
+const POSTED_OPTIONS = [['', 'All live jobs'], ['1', 'Last 24 hours'], ['3', 'Last 3 days'], ['7', 'Last 7 days'],
+  ['15', 'Last 15 days'], ['30', 'Last 30 days'], ['40', 'Last 40 days'], ['50', 'Last 50 days'], ['60', 'Last 60 days']]
 const EXPERIENCE_OPTIONS = [['', 'Any'], ['0', 'Fresher'], ['1', '1 year'], ['2', '2 years'], ['3', '3 years'],
   ['5', '5 years'], ['8', '8 years or more']]
 const QUICK_SEARCHES = [
@@ -125,7 +127,7 @@ export default function SearchPage() {
           <h1 className="font-display text-4xl sm:text-6xl leading-[1.05] max-w-2xl">Find work in Kolkata</h1>
           <p lang="bn" className="font-display text-xl sm:text-2xl text-taxi/90 mt-2">{BENGALI_LINE}</p>
           <p className="mt-4 max-w-xl text-white/80">
-            Every current job from Salt Lake to Howrah in one place: company career pages, job sites,
+            Every live job from Salt Lake to Howrah in one place: company career pages, job sites,
             recruiters and campus drives, checked every day.
           </p>
           <form className="mt-7 flex max-w-2xl rounded-md overflow-hidden shadow-2xl ring-1 ring-black/10"
@@ -153,7 +155,7 @@ export default function SearchPage() {
       {market && (
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-6xl mx-auto px-0 sm:px-4 grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200">
-            <Stat value={market.open_jobs.toLocaleString('en-IN')} label="current jobs in Kolkata" />
+            <Stat value={market.open_jobs.toLocaleString('en-IN')} label="live jobs in Kolkata" />
             <Stat value={(newThisWeek || 0).toLocaleString('en-IN')} label="new in the last 7 days" tone="text-hooghly" />
             <Stat value={market.fresher_friendly_jobs.toLocaleString('en-IN')} label="open to freshers (0-1 year)"
                   tone="text-sindoor" />
@@ -259,7 +261,7 @@ export default function SearchPage() {
           {error && <p className="p-4 rounded bg-red-50 text-sindoor text-sm">{error}</p>}
           {!error && result && result.items.length === 0 && !loading && (
             <div className="p-8 bg-white border border-gray-200 rounded text-gray-700">
-              No current jobs match this search. Remove a filter or try a broader word, like "sales" or "teacher".
+              No live jobs match this search. Remove a filter or try a broader word, like "sales" or "teacher".
             </div>
           )}
           {result?.items.length > 0 && (

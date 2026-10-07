@@ -12,7 +12,7 @@ import { useToast } from '../lib/toast'
 const BADGE = {
   pending: ['Waiting for review', 'bg-amber-50 text-amber-900'],
   live: ['Live', 'bg-green-50 text-green-800'],
-  expired: ['Closed (over 30 days or link not working)', 'bg-gray-100 text-gray-700'],
+  expired: ['Closed (over 60 days old or link not working)', 'bg-gray-100 text-gray-700'],
   rejected: ['Not approved', 'bg-red-50 text-sindoor'],
   closed: ['Closed by you', 'bg-gray-100 text-gray-700'],
 }

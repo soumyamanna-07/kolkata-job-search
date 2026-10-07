@@ -108,7 +108,7 @@ export default function Layout() {
         <div className="max-w-6xl mx-auto px-4 py-8 grid gap-6 sm:grid-cols-3 text-sm">
           <div>
             <p className="font-display text-lg text-white">Kolkata Live Jobs</p>
-            <p className="mt-1">Current jobs across Kolkata, Salt Lake, New Town and Howrah, collected every day.</p>
+            <p className="mt-1">Live jobs across Kolkata, Salt Lake, New Town and Howrah, collected every day.</p>
           </div>
           <div className="grid gap-1">
             <Link to="/match" className="hover:text-white">Match my CV</Link>
@@ -117,7 +117,7 @@ export default function Layout() {
             <Link to="/share-job" className="hover:text-white">Share a job (students and TPOs)</Link>
           </div>
           <p>
-            A final-year project at Techno Main Salt Lake. Only jobs from the last 30 days are shown.
+            A final-year project at Techno Main Salt Lake. Only live jobs are shown: still open, and posted in the last 60 days.
             Always apply on the employer's or job site's own page, and never pay to get a job.
           </p>
         </div>

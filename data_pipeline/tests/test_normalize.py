@@ -126,11 +126,12 @@ class TestCleanJob(unittest.TestCase):
         self.assertEqual(job.work_mode, "hybrid")
         self.assertIn("python", job.skills)
 
-    def test_only_jobs_posted_in_last_30_days(self):
-        # a board can still list a 2019 post, but it is not a current job
+    def test_only_jobs_posted_in_last_60_days(self):
+        # a board can still list a 2019 post, but it is not a live job
         self.assertIsNone(clean_job(raw(posted_at=datetime(2019, 6, 5, tzinfo=timezone.utc)), now=NOW))
-        self.assertIsNone(clean_job(raw(posted_at=datetime(2026, 8, 25, tzinfo=timezone.utc)), now=NOW))  # 38 days
-        self.assertIsNone(clean_job(raw(posted_at=datetime(2026, 8, 1)), now=NOW))           # no timezone
+        self.assertIsNone(clean_job(raw(posted_at=datetime(2026, 7, 25, tzinfo=timezone.utc)), now=NOW))  # 69 days
+        self.assertIsNone(clean_job(raw(posted_at=datetime(2026, 7, 1)), now=NOW))           # no timezone
+        self.assertIsNotNone(clean_job(raw(posted_at=datetime(2026, 8, 25, tzinfo=timezone.utc)), now=NOW))  # 38 days
         self.assertIsNotNone(clean_job(raw(posted_at=datetime(2026, 9, 10, tzinfo=timezone.utc)), now=NOW))
         self.assertIsNotNone(clean_job(raw(posted_at=None), now=NOW))                        # date unknown
 

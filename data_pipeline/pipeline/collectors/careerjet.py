@@ -1,7 +1,7 @@
 """Careerjet job search API v4 (free publisher key: https://www.careerjet.co.in/partners/).
 
 GET https://search.api.careerjet.net/v4/query, Basic auth with the API key as user name.
-The API gives at most 10 pages of 100 jobs, newest first; we stop at jobs older than 30 days.
+The API gives at most 10 pages of 100 jobs, newest first; we stop at jobs older than 60 days (MAX_JOB_AGE_DAYS).
 """
 import time
 from datetime import datetime, timedelta, timezone
@@ -12,12 +12,13 @@ import requests
 
 from pipeline.collectors.base import TIMEOUT_SECONDS, USER_AGENT, CollectResult, safe_error
 from pipeline.models import RawJob
+from pipeline.normalize import MAX_JOB_AGE_DAYS
 
 API_URL = "https://search.api.careerjet.net/v4/query"
 PAGE_SIZE = 100
 MAX_PAGES = 10                        # the API's own limit
 PAGE_DELAY = 1.0
-MAX_AGE_DAYS = 30
+MAX_AGE_DAYS = MAX_JOB_AGE_DAYS        # same rule as the rest of the pipeline (60 days)
 SALARY_PERIOD = {"Y": "year", "M": "month", "H": "hour"}     # weekly / daily salaries are not kept
 
 
@@ -37,7 +38,7 @@ def _parse_date(value) -> Optional[datetime]:
 def collect(session: requests.Session, api_key: str, user_ip: str = "",
             now: Optional[datetime] = None) -> CollectResult:
     # snapshot=False: search results change with ranking, so a job missing today is not proof it closed
-    # (the 30-day rule closes old ones)
+    # (the 60-day rule closes old ones)
     result = CollectResult(source="careerjet", scope="careerjet", snapshot=False)
     if not api_key:
         result.error = "CAREERJET_API_KEY not set in .env (source skipped)"

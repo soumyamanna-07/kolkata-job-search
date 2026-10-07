@@ -27,7 +27,7 @@ function NotFound() {
   return (
     <div className="text-center py-16">
       <p className="text-gray-700">Page not found.</p>
-      <Link to="/" className="inline-block mt-3 text-dusk underline">See all current jobs</Link>
+      <Link to="/" className="inline-block mt-3 text-dusk underline">See all live jobs</Link>
     </div>
   )
 }

@@ -118,18 +118,18 @@ class TestPipelineEndToEnd(unittest.TestCase):
         msg = self.conn.execute("select error_message from public.pipeline_runs order by id desc limit 1").fetchone()[0]
         self.assertIn("not closing", msg)
 
-    def test_jobs_older_than_30_days_are_closed(self):
+    def test_jobs_older_than_60_days_are_closed(self):
         from pipeline import store
-        for key, source, days in [("new", "adzuna", 5), ("old", "adzuna", 40), ("own", "employer", 40)]:
+        for key, source, days in [("new", "adzuna", 5), ("mid", "adzuna", 45), ("old", "adzuna", 70), ("own", "employer", 70)]:
             self.conn.execute(
                 """insert into public.jobs (job_key, source, company_name, title, apply_url, posted_at)
                    values (%s, %s, 'X', %s, 'https://x.com', now() - make_interval(days => %s))""",
                 (key, source, key, days))
         self.conn.execute("""insert into public.jobs (job_key, source, company_name, title, apply_url, first_seen_at)
-                             values ('nodate', 'lever', 'X', 'nodate', 'https://x.com', now() - interval '45 days')""")
+                             values ('nodate', 'lever', 'X', 'nodate', 'https://x.com', now() - interval '75 days')""")
         self.assertEqual(store.close_expired(self.conn), 2)
         status = dict(self.conn.execute("select job_key, status from public.jobs").fetchall())
-        self.assertEqual(status, {"new": "open", "old": "closed", "own": "open", "nodate": "closed"})
+        self.assertEqual(status, {"new": "open", "mid": "open", "old": "closed", "own": "open", "nodate": "closed"})
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-// Ask AI: a chat about jobs and careers, with follow-up questions. Facts about current jobs come from real
+// Ask AI: a chat about jobs and careers, with follow-up questions. Facts about live jobs come from real
 // job posts on the site (shown under each answer); career advice comes from the AI's general knowledge.
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -90,7 +90,7 @@ function Reply({ item }) {
           {result.note && <p className="mt-4 text-sm text-gray-500">{result.note}</p>}
           {result.ai_written && (
             <p className="mt-4 text-xs text-gray-500">
-              Job facts come only from current posts on this site (yellow numbers open them). Advice is general:
+              Job facts come only from live posts on this site (yellow numbers open them). Advice is general:
               check details on the job page before applying.
             </p>
           )}
@@ -98,7 +98,7 @@ function Reply({ item }) {
       </div>
       {shown.length > 0 && (
         <div>
-          <h2 className="font-display text-xl mb-2">{result.ai_written ? 'Jobs in this answer' : 'Closest current jobs'}</h2>
+          <h2 className="font-display text-xl mb-2">{result.ai_written ? 'Jobs in this answer' : 'Closest live jobs'}</h2>
           <div className="bg-white border border-gray-200 rounded divide-y divide-gray-200">
             {shown.map((job) => <JobCard key={job.id} job={job} number={job.number} />)}
           </div>
@@ -151,7 +151,7 @@ export default function AskPage() {
       </div>
       <p className="mt-2 text-gray-600 max-w-2xl">
         Ask anything about jobs: which openings fit you, what to learn, salaries, interviews or your CV.
-        You can ask follow-up questions. Answers about openings use only real, current Kolkata jobs on this site.
+        You can ask follow-up questions. Answers about openings use only real, live Kolkata jobs on this site.
       </p>
 
       {chat.length === 0 && (
@@ -167,7 +167,7 @@ export default function AskPage() {
         {chat.map((item) => <Reply key={item.id} item={item} />)}
       </div>
 
-      {busy && <p className="mt-6 text-sm text-gray-500">Reading current jobs and writing an answer. This takes a few seconds.</p>}
+      {busy && <p className="mt-6 text-sm text-gray-500">Reading live jobs and writing an answer. This takes a few seconds.</p>}
       {error && <p className="mt-6 p-4 rounded bg-red-50 text-sindoor text-sm">{error}</p>}
 
       <form ref={bottom} onSubmit={(e) => { e.preventDefault(); ask(question) }}

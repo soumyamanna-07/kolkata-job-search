@@ -46,7 +46,7 @@ export default function MatchPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="font-display text-4xl">Match my CV</h1>
       <p className="mt-1 text-gray-600 max-w-2xl">
-        Upload your CV and we rank every current Kolkata job for you, explain each score, and show the
+        Upload your CV and we rank every live Kolkata job for you, explain each score, and show the
         skills that would open the most jobs. Your CV is read once and not saved.
       </p>
 
@@ -73,7 +73,7 @@ export default function MatchPage() {
             <h2 className="font-display text-2xl mb-3">Your top {result.items.length} jobs</h2>
             {result.items.length === 0 ? (
               <p className="p-6 bg-white border border-gray-200 rounded text-gray-700">
-                No current jobs match this CV yet. Try again in a few days, or set up a job alert.
+                No live jobs match this CV yet. Try again in a few days, or set up a job alert.
               </p>
             ) : (
               <div className="bg-white border border-gray-200 rounded divide-y divide-gray-200">

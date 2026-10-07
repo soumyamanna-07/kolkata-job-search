@@ -3,7 +3,7 @@
 POST https://in.jooble.org/api/<key> with {"keywords", "location", "page", ...}.
 Keys are per country: an India key works only on in.jooble.org (a key from jooble.org
 searches US jobs). We search "Kolkata" once per common job keyword and merge the results
-(same job id = same job). Jobs older than 30 days are dropped here, so a run stays small.
+(same job id = same job). Jobs older than 60 days (MAX_JOB_AGE_DAYS) are dropped here.
 """
 import re
 import time
@@ -15,6 +15,7 @@ import requests
 from pipeline.collectors.base import TIMEOUT_SECONDS, CollectResult, safe_error
 from pipeline.collectors.salary_text import parse_salary
 from pipeline.models import RawJob
+from pipeline.normalize import MAX_JOB_AGE_DAYS
 
 API_URL = "https://in.jooble.org/api/{key}"
 LOCATION = "Kolkata"
@@ -30,7 +31,7 @@ RESULTS_PER_PAGE = 50
 PAGES_PER_KEYWORD = 3             # a keyword rarely has more than 150 Kolkata jobs
 MAX_REQUESTS = 100                # safety limit for one run
 PAGE_DELAY = 1.0
-MAX_AGE_DAYS = 30
+MAX_AGE_DAYS = MAX_JOB_AGE_DAYS        # same rule as the rest of the pipeline (60 days)
 
 
 def _parse_date(value) -> Optional[datetime]:
@@ -65,7 +66,7 @@ def _to_job(item: dict) -> RawJob:
 
 def collect(session: requests.Session, api_key: str, now: Optional[datetime] = None) -> CollectResult:
     # snapshot=False: search results change with ranking, so a job missing today is not proof it closed
-    # (the 30-day rule closes old ones)
+    # (the 60-day rule closes old ones)
     result = CollectResult(source="jooble", scope="jooble", snapshot=False)
     if not api_key:
         result.error = "JOOBLE_API_KEY not set in .env (source skipped)"

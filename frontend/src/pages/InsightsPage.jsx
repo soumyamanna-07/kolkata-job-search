@@ -31,7 +31,7 @@ function Bars({ rows, labelFor = (v) => v, linkFor }) {
 
 // jobs posted per day: vertical bars, hover a bar to see the date and count
 function DailyChart({ days }) {
-  const last = days.slice(-30)
+  const last = days.slice(-60)
   const max = Math.max(...last.map((d) => d.count), 1)
   return (
     <div>
@@ -79,7 +79,7 @@ export default function InsightsPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="font-display text-4xl">Kolkata job market today</h1>
       <p className="mt-1 text-gray-600 max-w-2xl">
-        Worked out from every current job on this site. It changes every day as jobs open and close.
+        Worked out from every live job on this site. It changes every day as jobs open and close.
       </p>
 
       {error && <p className="mt-6 p-4 rounded bg-red-50 text-sindoor text-sm">{error}</p>}
@@ -88,7 +88,7 @@ export default function InsightsPage() {
       {data && (
         <>
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 bg-white border border-gray-200 rounded divide-x divide-gray-200">
-            {[[data.open_jobs.toLocaleString('en-IN'), 'current jobs'],
+            {[[data.open_jobs.toLocaleString('en-IN'), 'live jobs'],
               [`${data.fresher_friendly_share}%`, 'open to freshers (0-1 year)'],
               [lakh(data.salary.median), 'middle yearly salary'],
               [`${lakh(data.salary.p25)} - ${lakh(data.salary.p75)}`, 'middle half of salaries']].map(([v, l]) => (
@@ -103,12 +103,12 @@ export default function InsightsPage() {
           </p>
 
           <div className="mt-6 grid lg:grid-cols-2 gap-5 items-start">
-            <Panel title="Skills employers ask for most" note="Number of current jobs asking for each skill. Click a skill to see its jobs.">
+            <Panel title="Skills employers ask for most" note="Number of live jobs asking for each skill. Click a skill to see its jobs.">
               <Bars rows={data.top_skills.slice(0, 15).map((s) => ({ value: s.skill, count: s.jobs }))}
                     linkFor={(skill) => `/?skills=${encodeURIComponent(skill)}`} />
             </Panel>
             <div className="grid gap-5">
-              <Panel title="Jobs posted per day" note="Last 30 days. Point at a bar to see the date.">
+              <Panel title="Jobs posted per day" note="Last 60 days. Point at a bar to see the date.">
                 <DailyChart days={data.posted_per_day} />
               </Panel>
               <Panel title="Where the jobs are">
