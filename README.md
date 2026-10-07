@@ -12,16 +12,7 @@ Final Year B.Tech Project · CSE (AI & ML) · Techno Main Salt Lake
 - Employer portal with spam verification before jobs go live
 - Admin panel for moderation, pipeline health and analytics
 
-## Team
-| Role | Area | Folder | Member |
-|------|------|--------|--------|
-| M1 | AI/ML Engineering | `AI &ml/` | _name_ |
-| M2 | Data Engineering | `data_pipeline/` | _name_ |
-| M3 | Backend, Database & Security | `backend/` | _name_ |
-| M4 | Frontend & UI/UX | `frontend/` | _name_ |
-| M5 | Employer Portal, Verification & Admin | `admin/` | _name_ |
 
-## Project structure
 kolkata-job-search/
 ├── data_pipeline/ collectors, cleaning, open/close check (M2)
 ├── backend/ FastAPI, database, auth, security (M3)
