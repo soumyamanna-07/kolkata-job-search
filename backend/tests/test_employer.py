@@ -35,6 +35,13 @@ class TestSpamCheck(unittest.TestCase):
                                "https://abctech.in")
         self.assertEqual(elsewhere.reasons, ["apply_link_on_other_site"])
 
+    def test_agency_may_use_client_apply_link(self):
+        r = spam.check("Analyst", GOOD_DESC, "https://careers.client-company.in/apply", "jobs@2coms.com",
+                       "https://2coms.com", agency=True)
+        self.assertEqual(r.reasons, [])                                      # normal for an agency
+        r = spam.check("Analyst", GOOD_DESC, "https://bit.ly/x", "jobs@2coms.com", None, agency=True)
+        self.assertIn("link_shortener", r.reasons)                           # still caught
+
 
 @unittest.skipUnless(TEST_DB, "set TEST_DATABASE_URL to run API tests")
 class TestEmployerFlow(unittest.TestCase):
@@ -57,9 +64,9 @@ class TestEmployerFlow(unittest.TestCase):
         for p in cls.patches:
             p.start()
         cls.db = psycopg.connect(TEST_DB, autocommit=True)
-        cls.ids = {name: str(uuid.uuid4()) for name in ("emp", "emp2", "cand", "admin")}
+        cls.ids = {name: str(uuid.uuid4()) for name in ("emp", "emp2", "agency", "cand", "admin")}
         for name, uid in cls.ids.items():
-            meta = '{"account_type": "employer"}' if name.startswith("emp") else '{}'
+            meta = '{"account_type": "employer"}' if name.startswith("emp") or name == "agency" else '{}'
             cls.db.execute("insert into auth.users (id, email, raw_user_meta_data) values (%s, %s, %s)",
                            (uid, f"{name}@test.in", meta))
         cls.db.execute("update public.profiles set role = 'admin' where id = %s", (cls.ids["admin"],))
@@ -173,6 +180,27 @@ class TestEmployerFlow(unittest.TestCase):
         self.assertEqual(open_jobs, 0)
         self.assertEqual(c.post("/api/employer/jobs", json=self.job(), headers=h["emp2"]).status_code, 403)
         self.assertEqual(self.profile("emp2").status_code, 403)
+
+    def test_agency_posts_for_client(self):
+        c, h = self.client, self.auth
+        agency = self.ids["agency"]
+        r = self.profile("agency", company_name="2coms", official_email="jobs@2coms.com",
+                         website="https://2coms.com", account_kind="agency")
+        self.assertEqual(r.json()["account_kind"], "agency")
+        self.review(f"/api/admin/employers/{agency}/review", "approve")
+
+        job = self.job(apply_url="https://careers.xyzclient.in/apply/7")
+        r = c.post("/api/employer/jobs", json=job, headers=h["agency"])
+        self.assertEqual(r.status_code, 422)                                   # must name the client
+        sub = c.post("/api/employer/jobs", json={**job, "hiring_for": "XYZ Client Ltd"}, headers=h["agency"]).json()
+        self.assertEqual(sub["hiring_for"], "XYZ Client Ltd")
+        queue = c.get("/api/admin/submissions", headers=h["admin"]).json()
+        mine = [s for s in queue if s["id"] == sub["id"]][0]
+        self.assertEqual((mine["account_kind"], mine["spam_reasons"]), ("agency", []))
+
+        live_id = self.review(f"/api/admin/submissions/{sub['id']}/review", "approve").json()["published_job_id"]
+        live = c.get(f"/api/jobs/{live_id}").json()
+        self.assertEqual((live["company_name"], live["posted_by"]), ("XYZ Client Ltd", "2coms"))   # "via 2coms"
 
     def test_validation(self):
         c, h = self.client, self.auth

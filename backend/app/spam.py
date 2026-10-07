@@ -50,7 +50,10 @@ def _same_site(a: str, b: str) -> bool:
 
 
 def check(title: str, description: str, apply_url: str, official_email: str, website: Optional[str],
-          salary_max: Optional[int] = None, experience_max: Optional[float] = None) -> SpamResult:
+          salary_max: Optional[int] = None, experience_max: Optional[float] = None,
+          agency: bool = False) -> SpamResult:
+    """agency=True: a recruitment agency posting for a client, so an apply link on the
+    client's own website is normal and not counted as "apply_link_on_other_site"."""
     text = f"{title}\n{description}"
     points: dict[str, int] = {}
 
@@ -63,7 +66,7 @@ def check(title: str, description: str, apply_url: str, official_email: str, web
     email_domain = (official_email or "").rsplit("@", 1)[-1].lower()
     if apply_host in LINK_SHORTENERS:
         points["link_shortener"] = 25
-    elif apply_host and not any(_same_site(apply_host, h) for h in (site_host, email_domain)) \
+    elif apply_host and not agency and not any(_same_site(apply_host, h) for h in (site_host, email_domain)) \
             and not any(apply_host == t or apply_host.endswith("." + t) for t in TRUSTED_APPLY_HOSTS):
         points["apply_link_on_other_site"] = 10
     if email_domain in FREE_EMAIL_DOMAINS:

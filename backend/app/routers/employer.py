@@ -1,7 +1,11 @@
-"""Employer portal: company details and job posts.
+"""Employer (recruiter) portal: company details and job posts.
 
-Flow: sign up as employer -> fill company details -> an admin approves the company
+Flow: sign up as a recruiter -> fill company details -> an admin approves the company
 -> post jobs -> automatic spam check -> an admin approves each job -> it goes live.
+
+Recruiters are either in-house HR (account_kind "company") or a recruitment agency
+("agency"). Agencies must say which client company each job is at (hiring_for); the
+live job then shows the client's name, "via <agency>".
 """
 from uuid import UUID
 
@@ -20,10 +24,10 @@ router = APIRouter(prefix="/api/employer", tags=["employer"])
 employer_only = require_role("employer")
 posts_per_day = PerKeyLimiter(20, window=86400)
 
-PROFILE_COLUMNS = ("company_name, official_email, website, gst_or_cin, verification_status, "
+PROFILE_COLUMNS = ("company_name, official_email, website, gst_or_cin, account_kind, verification_status, "
                    "rejection_reason, updated_at")
-SUBMISSION_COLUMNS = ("id, title, description, skills, location, area, apply_url, salary_min, salary_max, "
-                      "experience_min, experience_max, job_type, work_mode, status, rejection_reason, "
+SUBMISSION_COLUMNS = ("id, title, description, hiring_for, skills, location, area, apply_url, salary_min, "
+                      "salary_max, experience_min, experience_max, job_type, work_mode, status, rejection_reason, "
                       "published_job_id, created_at, updated_at")
 NOT_APPROVED = {
     "pending": "Your company details are waiting for admin approval. You can post jobs once approved.",
@@ -55,12 +59,24 @@ def _skills(body: JobSubmissionIn) -> list[str]:
 
 def _spam(body: JobSubmissionIn, profile: dict) -> spam.SpamResult:
     return spam.check(body.title, body.description, body.apply_url, profile["official_email"],
-                      profile["website"], body.salary_max, body.experience_max)
+                      profile["website"], body.salary_max, body.experience_max,
+                      agency=profile["account_kind"] == "agency")
 
 
-def _job_values(body: JobSubmissionIn) -> tuple:
-    return (body.title.strip(), body.description.strip(), _skills(body), body.location, body.area, body.apply_url,
-            body.salary_min, body.salary_max, body.experience_min, body.experience_max, body.job_type, body.work_mode)
+def _hiring_for(body: JobSubmissionIn, profile: dict):
+    """Agencies must name the client company; for in-house HR it is always their own company."""
+    if profile["account_kind"] != "agency":
+        return None
+    name = (body.hiring_for or "").strip()
+    if not name:
+        raise HTTPException(422, "Recruitment agencies must say which company the job is at (hiring_for).")
+    return name
+
+
+def _job_values(body: JobSubmissionIn, profile: dict) -> tuple:
+    return (body.title.strip(), body.description.strip(), _hiring_for(body, profile), _skills(body), body.location,
+            body.area, body.apply_url, body.salary_min, body.salary_max, body.experience_min, body.experience_max,
+            body.job_type, body.work_mode)
 
 
 # ---------------------------------------------------------------- company details
@@ -85,11 +101,13 @@ def save_profile(body: EmployerProfileIn, user: CurrentUser = Depends(employer_o
         return EmployerProfile(**old)                    # nothing changed: keep the current status
     with conn.cursor(row_factory=dict_row) as cur:
         row = cur.execute(
-            f"""insert into public.employer_profiles (user_id, company_name, official_email, website, gst_or_cin)
-                values (%(uid)s, %(company_name)s, %(official_email)s, %(website)s, %(gst_or_cin)s)
+            f"""insert into public.employer_profiles (user_id, company_name, official_email, website, gst_or_cin,
+                                                      account_kind)
+                values (%(uid)s, %(company_name)s, %(official_email)s, %(website)s, %(gst_or_cin)s, %(account_kind)s)
                 on conflict (user_id) do update set
                     company_name = excluded.company_name, official_email = excluded.official_email,
                     website = excluded.website, gst_or_cin = excluded.gst_or_cin,
+                    account_kind = excluded.account_kind,
                     verification_status = 'pending', rejection_reason = null,
                     reviewed_by = null, reviewed_at = null
                 returning {PROFILE_COLUMNS}""",
@@ -105,15 +123,16 @@ def submit_job(body: JobSubmissionIn, user: CurrentUser = Depends(employer_only)
     profile = _approved_profile(conn, user.id)
     if not posts_per_day.allow(user.id):
         raise HTTPException(429, "You can post up to 20 jobs a day. Please try again tomorrow.")
+    values = _job_values(body, profile)
     check = _spam(body, profile)
     with conn.cursor(row_factory=dict_row) as cur:
         row = cur.execute(
-            f"""insert into public.job_submissions (employer_id, title, description, skills, location, area,
-                    apply_url, salary_min, salary_max, experience_min, experience_max, job_type, work_mode,
+            f"""insert into public.job_submissions (employer_id, title, description, hiring_for, skills, location,
+                    area, apply_url, salary_min, salary_max, experience_min, experience_max, job_type, work_mode,
                     spam_score, spam_reasons)
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 returning {SUBMISSION_COLUMNS}""",
-            (user.id, *_job_values(body), check.score, check.reasons)).fetchone()
+            (user.id, *values, check.score, check.reasons)).fetchone()
     return JobSubmission(**row)
 
 
@@ -150,16 +169,18 @@ def edit_job(job_id: UUID, body: JobSubmissionIn, user: CurrentUser = Depends(em
     if old["status"] not in ("pending", "rejected"):
         raise HTTPException(409, "Only posts waiting for review or rejected ones can be edited. "
                                  "To change a live job, close it and post it again.")
+    values = _job_values(body, profile)
     check = _spam(body, profile)
     with conn.cursor(row_factory=dict_row) as cur:
         row = cur.execute(
-            f"""update public.job_submissions set title = %s, description = %s, skills = %s, location = %s,
-                    area = %s, apply_url = %s, salary_min = %s, salary_max = %s, experience_min = %s,
-                    experience_max = %s, job_type = %s, work_mode = %s, spam_score = %s, spam_reasons = %s,
+            f"""update public.job_submissions set title = %s, description = %s, hiring_for = %s, skills = %s,
+                    location = %s, area = %s, apply_url = %s, salary_min = %s, salary_max = %s,
+                    experience_min = %s, experience_max = %s, job_type = %s, work_mode = %s,
+                    spam_score = %s, spam_reasons = %s,
                     status = 'pending', rejection_reason = null, reviewed_by = null, reviewed_at = null
                 where id = %s and employer_id = %s
                 returning {SUBMISSION_COLUMNS}""",
-            (*_job_values(body), check.score, check.reasons, job_id, user.id)).fetchone()
+            (*values, check.score, check.reasons, job_id, user.id)).fetchone()
     return JobSubmission(**row)
 
 

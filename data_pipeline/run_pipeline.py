@@ -1,13 +1,15 @@
 """Run the data pipeline: collect -> Kolkata filter -> clean -> de-duplicate -> save -> close.
 
-Only CURRENT jobs are kept open: posted in the last 30 days (see normalize.MAX_JOB_AGE_DAYS).
+Only CURRENT jobs are kept open: posted in the last 60 days (see normalize.MAX_JOB_AGE_DAYS).
+Work-from-home jobs open to India (Jobicy, Jooble "work from home" searches) are kept too.
+Government recruitment notices are read from official pages (Company List, platform "government").
 
 Run from the project root:
     python data_pipeline/run_pipeline.py --dry-run     (collect and show results, write nothing)
     python data_pipeline/run_pipeline.py               (full run, writes to the database)
 
 Options:
-    --sources lever,greenhouse,adzuna   only run these sources
+    --sources lever,greenhouse,ashby,workable,career_page,government,adzuna,jooble,careerjet,jobicy
     --adzuna-mode recent|full           recent = new jobs only (daily), full = all jobs + closing (weekly)
     --trigger schedule|manual           recorded in pipeline_runs (GitHub Actions uses schedule)
 """
@@ -17,12 +19,16 @@ import time
 import traceback
 
 from pipeline import config, store
-from pipeline.collectors import adzuna, greenhouse, lever
+from pipeline.collectors import (adzuna, ashby, career_page, careerjet, government, greenhouse, jobicy, jooble,
+                                 lever, workable)
 from pipeline.collectors.base import CollectResult, make_session
 from pipeline.db import connect
-from pipeline.normalize import clean_job, deduplicate
+from pipeline.normalize import REMOTE_AREA, clean_job, deduplicate
 
-ALL_SOURCES = ("greenhouse", "lever", "adzuna")
+ALL_SOURCES = ("greenhouse", "lever", "ashby", "workable", "career_page", "government", "adzuna", "jooble",
+               "careerjet", "jobicy")
+# company job boards: platform name -> collector
+BOARD_COLLECTORS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby, "workable": workable}
 DELAY_BETWEEN_COMPANIES = 0.5   # seconds - be polite to job boards
 
 
@@ -30,22 +36,57 @@ def log(message: str) -> None:
     print(message, flush=True)
 
 
-def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "recent") -> list[CollectResult]:
+def collect_all(companies: list[dict], sources: set[str], adzuna_mode: str = "recent",
+                career_pages: list[dict] = (), government_pages: list[dict] = ()) -> list[CollectResult]:
     session = make_session()
     results = []
     for company in companies:
         platform = company["ats_platform"]
         if platform not in sources:
             continue
-        module = greenhouse if platform == "greenhouse" else lever
+        module = BOARD_COLLECTORS[platform]
         r = module.collect(session, company["ats_token"], company["name"], company["id"])
         results.append(r)
         log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
         time.sleep(DELAY_BETWEEN_COMPANIES)
+    if "career_page" in sources:
+        for company in career_pages:
+            r = career_page.collect(session, company["careers_url"], company["name"], company["id"])
+            results.append(r)
+            log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
+            time.sleep(DELAY_BETWEEN_COMPANIES)
+    if "government" in sources and government_pages:
+        gov_session = government.make_session()       # accepts old government web servers, still checks certificates
+        for office in government_pages:
+            r = government.collect(gov_session, office["careers_url"], office["name"], office["id"])
+            results.append(r)
+            log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}")
+            time.sleep(DELAY_BETWEEN_COMPANIES)
     if "adzuna" in sources:
         r = adzuna.collect(session, config.ADZUNA_APP_ID, config.ADZUNA_APP_KEY, adzuna_mode)
         results.append(r)
         log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'SKIPPED/FAILED: ' + (r.error or '')}"
+            f"  ({r.requests_made} API calls)")
+    if "jobicy" in sources:                     # remote jobs open to India; free, no key needed
+        r = jobicy.collect(session)
+        results.append(r)
+        log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}"
+            f"  ({r.requests_made} API calls)")
+    # aggregators that need a free key: skipped quietly until the key is in .env
+    aggregators = (
+        ("jooble", config.JOOBLE_API_KEY, lambda: jooble.collect(session, config.JOOBLE_API_KEY)),
+        ("careerjet", config.CAREERJET_API_KEY,
+         lambda: careerjet.collect(session, config.CAREERJET_API_KEY, config.CAREERJET_USER_IP)),
+    )
+    for name, key, run in aggregators:
+        if name not in sources:
+            continue
+        if not key:
+            log(f"  {name:<40}     -  skipped (no API key in .env yet)")
+            continue
+        r = run()
+        results.append(r)
+        log(f"  {r.scope:<40} {len(r.jobs):>5} jobs  {'OK' if r.complete else 'FAILED: ' + (r.error or '')}"
             f"  ({r.requests_made} API calls)")
     return results
 
@@ -80,7 +121,10 @@ def main() -> int:
     with connect() as conn:
         conn.autocommit = True
         companies = store.load_companies(conn)
-        log(f"Companies with a job board: {len(companies)}")
+        pages = store.load_career_pages(conn)
+        gov_pages = store.load_government_pages(conn)
+        log(f"Companies with a job board: {len(companies)} | with a careers page to read: {len(pages)} | "
+            f"government recruitment pages: {len(gov_pages)}")
 
         run_id = started_at = None
         if not args.dry_run:
@@ -89,13 +133,15 @@ def main() -> int:
 
         try:
             log("Collecting:")
-            results = collect_all(companies, sources, args.adzuna_mode)
+            results = collect_all(companies, sources, args.adzuna_mode, pages, gov_pages)
             jobs, stats = process(results)
-            log(f"Total collected: {stats['total_collected']} -> Kolkata: {stats['kolkata_count']} "
+            log(f"Total collected: {stats['total_collected']} -> Kolkata or work from home: {stats['kolkata_count']} "
                 f"-> Unique: {stats['unique_count']}")
 
             if args.dry_run:
-                for job in jobs[:5]:
+                remote = [job for job in jobs if job.area == REMOTE_AREA]
+                log(f"Work from home jobs (open to India): {len(remote)}")
+                for job in remote[:3] + [job for job in jobs if job.area != REMOTE_AREA][:3]:
                     salary = f"Rs {job.salary_min:,}-{job.salary_max or 0:,}" if job.salary_min else "Not disclosed"
                     log(f"  - {job.title} | {job.company_name} | {job.area} | {salary} | "
                         f"skills: {', '.join(job.skills[:6]) or '-'}")
@@ -105,7 +151,7 @@ def main() -> int:
             with conn.transaction():
                 stats["jobs_new"], stats["jobs_updated"] = store.save_jobs(conn, jobs)
                 stats["jobs_closed"], warnings = store.close_missing(conn, results, started_at)
-                expired = store.close_expired(conn)          # older than 30 days = not current
+                expired = store.close_expired(conn)          # older than 60 days = not current
                 stats["jobs_closed"] += expired
             log(f"Closed because older than {store.MAX_JOB_AGE_DAYS} days: {expired}")
             for w in warnings:
@@ -120,7 +166,8 @@ def main() -> int:
 
         except Exception as error:  # record the failure, then re-raise so CI shows it
             if run_id is not None:
-                store.finish_run(conn, run_id, "failed", {}, f"{type(error).__name__}: {error}\n{traceback.format_exc()}")
+                store.finish_run(conn, run_id, "failed", {},
+                                 f"{type(error).__name__}: {error}\n{traceback.format_exc()}")
             raise
 
 

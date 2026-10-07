@@ -13,9 +13,10 @@ from pipeline.models import CleanJob, RawJob
 from pipeline.skills import SKILLS
 
 MAX_DESCRIPTION_CHARS = 20000
-# A job is "current" only if it was posted in the last 30 days. Older posts are not
-# shown, even if a job board still lists them (store.close_expired closes them).
-MAX_JOB_AGE_DAYS = 30
+# A job is "live" only if it is still listed by its source AND was posted in the last 60 days.
+# Older posts are not shown, even if a job board still lists them (store.close_expired closes
+# them). On the site, people can narrow this down further (last 7, 15, 30, 40, 50 days ...).
+MAX_JOB_AGE_DAYS = 60
 
 # word in a location -> our standard area name (checked in this order)
 KOLKATA_AREAS: list[tuple[str, str]] = [
@@ -30,8 +31,16 @@ KOLKATA_AREAS: list[tuple[str, str]] = [
     ("rajarhat", "New Town"),
     ("howrah", "Howrah"),
     ("kolkata", "Kolkata"),
+    ("kolkatta", "Kolkata"),       # common misspelling (Jooble India uses it)
     ("calcutta", "Kolkata"),
 ]
+
+# work-from-home jobs open to people in India (collected on purpose, e.g. Jobicy, Jooble "work from home")
+# are kept even though they are not in Kolkata; they get this area instead of a Kolkata one
+REMOTE_AREA = "Work from home"
+
+# Salt Lake City is also a city in Utah, USA: a location that says it is in the USA is never Kolkata
+ABROAD_PATTERN = re.compile(r"(?<![a-z])(utah|usa|u\.s\.a?|united states)(?![a-z])|salt lake city,?\s*ut(?![a-z])")
 
 # If a job TITLE names one of these cities (and not Kolkata), the job is not in
 # Kolkata even if a source tagged it so. e.g. "Operations Manager - Kochi".
@@ -58,6 +67,8 @@ def find_area(locations: list[str]) -> Optional[str]:
     """Return our standard Kolkata area, or None if no location is in Kolkata."""
     for loc in locations:
         text = (loc or "").lower()
+        if ABROAD_PATTERN.search(text):
+            continue                                   # e.g. "Salt Lake City, UT, USA"
         for word, area in KOLKATA_AREAS:
             if re.search(rf"(?<![a-z]){re.escape(word)}(?![a-z])", text):
                 return area
@@ -230,8 +241,8 @@ def is_too_old(posted_at: Optional[datetime], now: Optional[datetime] = None) ->
 
 
 def clean_job(raw: RawJob, now: Optional[datetime] = None) -> Optional[CleanJob]:
-    """Return a CleanJob, or None if the job is not in Kolkata, too old, or unusable."""
-    area = find_area(raw.locations)
+    """Return a CleanJob, or None if the job is not in Kolkata (or work from home), too old, or unusable."""
+    area = find_area(raw.locations) or (REMOTE_AREA if raw.remote_from_india else None)
     title = clean_line(raw.title)
     company = clean_line(raw.company_name)
     apply_url = (raw.apply_url or "").strip()
@@ -263,7 +274,7 @@ def clean_job(raw: RawJob, now: Optional[datetime] = None) -> Optional[CleanJob]
         experience_min=exp_min,
         experience_max=exp_max,
         job_type=detect_job_type(title, raw.job_type_hint),
-        work_mode=detect_work_mode(title, raw.locations, raw.work_mode_hint),
+        work_mode="remote" if raw.remote_from_india else detect_work_mode(title, raw.locations, raw.work_mode_hint),
         skills=extract_skills(title, description),
         posted_at=raw.posted_at,
     )

@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api", tags=["alerts"])
 class AlertFilters(BaseModel):
     """Same filters as job search. Empty = not used."""
     q: Optional[str] = Field(default=None, max_length=200, description="search words, e.g. data analyst")
-    areas: list[Literal[AREAS]] = Field(default=[], max_length=4)
+    areas: list[Literal[AREAS]] = Field(default=[], max_length=len(AREAS))
     skills: list[str] = Field(default=[], max_length=20)
     salary_expected: Optional[int] = Field(default=None, ge=0, le=100_000_000, description="yearly INR")
     include_undisclosed_salary: bool = True
