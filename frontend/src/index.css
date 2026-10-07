@@ -121,3 +121,6 @@ html[data-theme="dark"] .border-t-dusk { border-top-color: var(--link); }
 html[data-theme="dark"] .bg-hooghly { background-color: #0e7c7b; }
 /* radio buttons and checkboxes stay visible on the dark page */
 html[data-theme="dark"] .accent-dusk { accent-color: var(--link); }
+/* drop-down lists: Windows draws the open list itself, so give it dark colours too */
+html[data-theme="dark"] select,
+html[data-theme="dark"] option { background-color: var(--surface); color: var(--color-ink); }
