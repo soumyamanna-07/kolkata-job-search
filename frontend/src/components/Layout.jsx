@@ -14,7 +14,7 @@ const LINKS = [
 ]
 
 function navClass({ isActive }) {
-  return `inline-flex items-center gap-2 px-3 py-2 rounded text-sm ${
+  return `inline-flex items-center gap-2 px-3 py-2 rounded text-sm whitespace-nowrap ${
     isActive ? 'text-white bg-white/12' : 'text-steel hover:text-white hover:bg-white/5'}`
 }
 
@@ -27,8 +27,11 @@ export default function Layout() {
 
   useEffect(() => setMenu(false), [location.pathname])           // close the phone menu after navigating
 
-  const userLinks = user ? [['/saved', `Saved${count ? ` (${count})` : ''}`, 'bookmark'],
-    ['/alerts', 'Alerts', 'bell'], ['/share-job', 'Share a job', 'link']] : []
+  // recruiters get their own area instead of the job seeker links
+  const userLinks = !user ? []
+    : profile?.role === 'employer' ? [['/employer', 'Recruiter area', 'briefcase']]
+      : [['/saved', `Saved${count ? ` (${count})` : ''}`, 'bookmark'],
+        ['/alerts', 'Alerts', 'bell'], ['/share-job', 'Share a job', 'link']]
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -44,7 +47,7 @@ export default function Layout() {
             <span className="font-display text-xl">Kolkata Live Jobs</span>
           </Link>
 
-          <nav className="hidden lg:flex gap-1 ml-4" aria-label="Main">
+          <nav className="hidden xl:flex gap-1 ml-4" aria-label="Main">
             {[...LINKS, ...userLinks].map(([to, label, icon]) => (
               <NavLink key={to} to={to} end={to === '/'} className={navClass}>
                 <Icon name={icon} className="w-4 h-4" />{label}
@@ -60,10 +63,10 @@ export default function Layout() {
             </button>
             {user ? (
               <>
-                <span className="hidden md:inline-flex items-center gap-1.5 text-steel max-w-44 truncate">
+                <span className="hidden md:inline-flex xl:hidden 2xl:inline-flex items-center gap-1.5 text-steel max-w-44 truncate">
                   <Icon name="user" className="w-4 h-4" />{profile?.full_name || user.email}
                 </span>
-                <button onClick={signOut} className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-white/30 hover:bg-white/10">
+                <button onClick={signOut} className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-white/30 hover:bg-white/10 whitespace-nowrap">
                   <Icon name="logout" className="w-4 h-4" /> Log out
                 </button>
               </>
@@ -72,7 +75,7 @@ export default function Layout() {
                 Log in
               </Link>
             )}
-            <button className="lg:hidden p-2 rounded hover:bg-white/10" onClick={() => setMenu(!menu)}
+            <button className="xl:hidden p-2 rounded hover:bg-white/10" onClick={() => setMenu(!menu)}
                     aria-expanded={menu} aria-label="Menu">
               <Icon name={menu ? 'close' : 'menu'} />
             </button>
@@ -80,7 +83,7 @@ export default function Layout() {
         </div>
 
         {menu && (
-          <nav className="lg:hidden border-t border-white/10 px-4 py-3 grid gap-1" aria-label="Main">
+          <nav className="xl:hidden border-t border-white/10 px-4 py-3 grid gap-1" aria-label="Main">
             {[...LINKS, ...userLinks].map(([to, label, icon]) => (
               <NavLink key={to} to={to} end={to === '/'} className={navClass}>
                 <Icon name={icon} className="w-4 h-4" />{label}
