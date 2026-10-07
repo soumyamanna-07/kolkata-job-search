@@ -5,6 +5,7 @@ import RequireAdmin from './components/RequireAdmin'
 import RequireEmployer from './components/RequireEmployer'
 import RequireLogin from './components/RequireLogin'
 import AdminDashboardPage from './pages/AdminDashboardPage'
+import AdminReportsPage from './pages/AdminReportsPage'
 import AdminReviewPage from './pages/AdminReviewPage'
 import AlertsPage from './pages/AlertsPage'
 import AskPage from './pages/AskPage'
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/employer/jobs/:id/edit" element={<RequireEmployer><EmployerPostPage /></RequireEmployer>} />
         <Route path="/admin" element={<RequireAdmin><AdminDashboardPage /></RequireAdmin>} />
         <Route path="/admin/review" element={<RequireAdmin><AdminReviewPage /></RequireAdmin>} />
+        <Route path="/admin/reports" element={<RequireAdmin><AdminReportsPage /></RequireAdmin>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>

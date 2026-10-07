@@ -48,7 +48,7 @@ export default function AdminDashboardPage() {
             <div className="grid sm:grid-cols-3 gap-4">
               <Waiting value={stats.pending_employers} label="recruiters to approve" to="/admin/review" />
               <Waiting value={stats.pending_job_posts} label="job posts to approve" to="/admin/review" />
-              <Waiting value={stats.open_reports} label="jobs reported by users" to="/admin" />
+              <Waiting value={stats.open_reports} label="jobs reported by users" to="/admin/reports" />
             </div>
           </section>
 

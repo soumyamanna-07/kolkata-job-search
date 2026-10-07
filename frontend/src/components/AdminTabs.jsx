@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom'
 const TABS = [
   ['/admin', 'Dashboard'],
   ['/admin/review', 'Review recruiters and jobs'],
+  ['/admin/reports', 'Reports and shared links'],
 ]
 
 export default function AdminTabs() {
