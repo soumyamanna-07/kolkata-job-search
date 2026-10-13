@@ -1,0 +1,331 @@
+{
+ "_comment": "Held-out test set for Stage 1.10. Fill in 'skills' for every subject by hand (names from shared/skills.json; [] = teaches no listed job skill) WITHOUT looking at the website's mapping. Then evaluate once; do not change the mapper after that.",
+ "labelled_by": "project author (not labelled yet)",
+ "from": "IT syllabus (website, https://www.makautexam.net/aicte_details/CourseStructureI/IT20.pdf)",
+ "subjects": [
+  {
+   "name": "Physics-I",
+   "skills": null
+  },
+  {
+   "name": "Chemistry-I",
+   "skills": null
+  },
+  {
+   "name": "Mathematics - IA",
+   "skills": null
+  },
+  {
+   "name": "Mathematics - IB",
+   "skills": null
+  },
+  {
+   "name": "Basic Electrical Engineering",
+   "skills": null
+  },
+  {
+   "name": "Physics-I Laboratory / Chemistry-I Laboratory",
+   "skills": null
+  },
+  {
+   "name": "Basic Electrical Engineering Laboratory",
+   "skills": null
+  },
+  {
+   "name": "Engineering Graphics & Design / Workshop / Manufacturing Practices",
+   "skills": null
+  },
+  {
+   "name": ") - CSE & IT Mathematics - IB (",
+   "skills": null
+  },
+  {
+   "name": "); Workshop / Manufacturing Practices (",
+   "skills": null
+  },
+  {
+   "name": ") Semester II (First Year) Sl. No. Type of course Code Course Title Hours per week Credits Lecture Tutorial Practical Th",
+   "skills": null
+  },
+  {
+   "name": "Mathematics - IIA",
+   "skills": null
+  },
+  {
+   "name": "Mathematics - IIB",
+   "skills": null
+  },
+  {
+   "name": "Programming for Problem Solving",
+   "skills": null
+  },
+  {
+   "name": "English",
+   "skills": null
+  },
+  {
+   "name": "Physics-I Laboratory (Gr",
+   "skills": null
+  },
+  {
+   "name": "B) / Chemistry-I Laboratory 2 Engineering Science Course",
+   "skills": null
+  },
+  {
+   "name": "Language Laboratory",
+   "skills": null
+  },
+  {
+   "name": ") - CSE & IT Mathematics - II (",
+   "skills": null
+  },
+  {
+   "name": ") Physics-I (",
+   "skills": null
+  },
+  {
+   "name": "Digital Electronics",
+   "skills": null
+  },
+  {
+   "name": "Data Structure & Algorithms",
+   "skills": null
+  },
+  {
+   "name": "Signals & System",
+   "skills": null
+  },
+  {
+   "name": "Mathematics- III",
+   "skills": null
+  },
+  {
+   "name": "Biology",
+   "skills": null
+  },
+  {
+   "name": "Digital Electronics Lab",
+   "skills": null
+  },
+  {
+   "name": "Data Structure & Algorithms Lab",
+   "skills": null
+  },
+  {
+   "name": "IT Workshop (Sci-Lab / R)",
+   "skills": null
+  },
+  {
+   "name": "Discrete Mathematics",
+   "skills": null
+  },
+  {
+   "name": "Computer Organization & Architecture",
+   "skills": null
+  },
+  {
+   "name": "Formal Language & Automata Theory",
+   "skills": null
+  },
+  {
+   "name": "Communication Engineering",
+   "skills": null
+  },
+  {
+   "name": "Economics For Engineers",
+   "skills": null
+  },
+  {
+   "name": "Environmental Sciences 1 - - 0 Practical 1 Professional Core Course",
+   "skills": null
+  },
+  {
+   "name": "Computer Organization & Architecture Lab",
+   "skills": null
+  },
+  {
+   "name": "Communication Engineering Lab",
+   "skills": null
+  },
+  {
+   "name": "Design Analysis & Algorithm",
+   "skills": null
+  },
+  {
+   "name": "DBMS",
+   "skills": null
+  },
+  {
+   "name": "Operating Systems",
+   "skills": null
+  },
+  {
+   "name": "Object Oriented Programming with Python",
+   "skills": null
+  },
+  {
+   "name": "Introduction to Industrial Management (Humanities III)",
+   "skills": null
+  },
+  {
+   "name": "(Elective-I) Human Computer Interaction",
+   "skills": null
+  },
+  {
+   "name": "Advanced Computer Architecture",
+   "skills": null
+  },
+  {
+   "name": "Computer Graphics",
+   "skills": null
+  },
+  {
+   "name": "Constitution of India",
+   "skills": null
+  },
+  {
+   "name": "Essence of - - - 1 Maulana Abul Kalam Azad University of Technology, West Bengal Syllabus for 4-Y",
+   "skills": null
+  },
+  {
+   "name": "Design Analysis & Algorithm Lab",
+   "skills": null
+  },
+  {
+   "name": "DBMS Lab",
+   "skills": null
+  },
+  {
+   "name": "Operating Systems Lab",
+   "skills": null
+  },
+  {
+   "name": "Object Oriented Programming with Python Lab",
+   "skills": null
+  },
+  {
+   "name": "Software Engineering",
+   "skills": null
+  },
+  {
+   "name": "Computer Networks",
+   "skills": null
+  },
+  {
+   "name": "(Elective-II) Compiler Design",
+   "skills": null
+  },
+  {
+   "name": "Distributed Systems",
+   "skills": null
+  },
+  {
+   "name": "Image Processing",
+   "skills": null
+  },
+  {
+   "name": "(Elective-III) Artificial Intelligence",
+   "skills": null
+  },
+  {
+   "name": "Internet of Things",
+   "skills": null
+  },
+  {
+   "name": "Natural Language Processing",
+   "skills": null
+  },
+  {
+   "name": "Machine Learning",
+   "skills": null
+  },
+  {
+   "name": "(Open Elective-I) Big Data Analytics",
+   "skills": null
+  },
+  {
+   "name": "Cyber Law & Ethics",
+   "skills": null
+  },
+  {
+   "name": "Mobile Computing",
+   "skills": null
+  },
+  {
+   "name": "Bioinformatics",
+   "skills": null
+  },
+  {
+   "name": "Robotics",
+   "skills": null
+  },
+  {
+   "name": "Software Engineering Lab",
+   "skills": null
+  },
+  {
+   "name": "Computer Networks Lab",
+   "skills": null
+  },
+  {
+   "name": "Internet & Web Technology",
+   "skills": null
+  },
+  {
+   "name": "(Elective-V) Multimedia Technology",
+   "skills": null
+  },
+  {
+   "name": "Information Theory and Coding",
+   "skills": null
+  },
+  {
+   "name": "Cyber Security",
+   "skills": null
+  },
+  {
+   "name": "Cloud Computing",
+   "skills": null
+  },
+  {
+   "name": "(Open Elective-II) Operations Research",
+   "skills": null
+  },
+  {
+   "name": "Introduction to Philosophical Thoughts",
+   "skills": null
+  },
+  {
+   "name": "Soft Skill & Interpersonal Communication",
+   "skills": null
+  },
+  {
+   "name": "Numerical Methods",
+   "skills": null
+  },
+  {
+   "name": "Management 1 (Organizational Behavior)",
+   "skills": null
+  },
+  {
+   "name": "Information Security",
+   "skills": null
+  },
+  {
+   "name": "(Open Elective-III) Digital Signal Processing",
+   "skills": null
+  },
+  {
+   "name": "(Open Elective-IV) E-Commerce and ERP",
+   "skills": null
+  },
+  {
+   "name": "Economic Policies in India",
+   "skills": null
+  },
+  {
+   "name": "Remote Sensing & GIS",
+   "skills": null
+  }
+ ]
+}

@@ -50,6 +50,16 @@ class TestMeasures(unittest.TestCase):
         self.assertIn("Python Programming,pandas,missed (false negative)", errors)
 
 
+class TestUnlabelled(unittest.TestCase):
+    def test_unlabelled_set_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "gold.json"
+            path.write_text(json.dumps({"subjects": [{"name": "Compiler Design", "skills": None}]}))
+            with self.assertRaises(SystemExit) as ctx:
+                em.load_gold(path)
+        self.assertIn("not labelled yet", str(ctx.exception))
+
+
 class TestSweep(unittest.TestCase):
     def test_sweep_restores_cut_off(self):
         from app import embeddings, subject_skills as ss

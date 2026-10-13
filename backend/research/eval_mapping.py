@@ -90,6 +90,9 @@ def bootstrap_f1(pairs: list[tuple[set, set]], rounds: int = BOOTSTRAP, seed: in
 def load_gold(path: Path = GOLD_FILE) -> list[dict]:
     known = set(ss.SKILLS)
     subjects = json.loads(path.read_text(encoding="utf-8"))["subjects"]
+    todo = [s["name"] for s in subjects if s.get("skills") is None]
+    if todo:
+        raise SystemExit(f"{len(todo)} subjects are not labelled yet (skills is null), e.g. {todo[:3]}")
     for s in subjects:
         unknown = [k for k in s["skills"] if k not in known]
         if unknown:
