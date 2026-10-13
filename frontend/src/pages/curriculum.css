@@ -1,0 +1,43 @@
+/* Curriculum gap report: status colours for "is this skill taught?".
+   Checked with the colour-blindness validator for light and dark; every bar also has its status
+   written in words, so colour is never the only signal. */
+.cg {
+  --cg-covered: #13894f;
+  --cg-elective: #3f73c8;
+  --cg-partial: #c98500;
+  --cg-missing: #c8323a;
+  --cg-track: #e7ebee;
+  --cg-whisker: #1b1f24;
+}
+html[data-theme="dark"] .cg {
+  --cg-covered: #2f9e68;
+  --cg-elective: #5a86d6;
+  --cg-partial: #c08a12;
+  --cg-missing: #e0555f;
+  --cg-track: #22323f;
+  --cg-whisker: #e6ecf2;
+}
+.cg-covered { background-color: var(--cg-covered); }
+.cg-elective { background-color: var(--cg-elective); }
+.cg-partial { background-color: var(--cg-partial); }
+.cg-missing { background-color: var(--cg-missing); }
+.cg-track { background-color: var(--cg-track); }
+.cg-whisker { background-color: var(--cg-whisker); }
+
+/* the tooltip shows on hover and on keyboard focus */
+.cg-row:hover .cg-tip,
+.cg-row:focus-visible .cg-tip,
+.cg-col:hover .cg-tip,
+.cg-col:focus-visible .cg-tip { display: block; }
+
+/* "Print for HOD": only the report is printed, on white paper */
+@media print {
+  header, footer, nav, .no-print, .login-nudge { display: none !important; }
+  html, body, main { background: #fff !important; color: #000 !important; }
+  .cg-print-page { max-width: none !important; padding: 0 !important; }
+  .cg section, .cg .print-avoid { break-inside: avoid; }
+  .cg details { display: block; }
+  .cg details > summary { list-style: none; }
+  .cg .cg-tip { display: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

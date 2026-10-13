@@ -72,7 +72,7 @@ def base_name(name: str) -> str:
 # (pattern on the base name, [(skill, weight)]). Weight 0.9 = the subject is mainly about the skill,
 # 0.6 = the subject teaches a good part of it, 0.4 = it gives the background for it.
 CURRICULUM: list[tuple[str, list[tuple[str, float]]]] = [
-    (r"programming for problem solving|\bc programming\b|computer programming",
+    (r"programming for problem solving|\bc programming\b|computer programming|programming (?:in|using|with) c\b(?![+#])",
      [("c", 0.9)]),
     (r"object oriented|\boops?\b",
      [("java", 0.6), ("c++", 0.6)]),

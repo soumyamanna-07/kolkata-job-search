@@ -8,6 +8,7 @@ const PATHS = {
   file: 'M6 2h8l5 5v15H6ZM14 2v5h5M9 13h7M9 17h7',
   spark: 'M12 3l2 6l6 2l-6 2l-2 6l-2-6l-6-2l6-2Z',
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  book: 'M4 19V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2a2 2 0 0 0 2 2h14M8 7h8M8 11h6',
   link: 'M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1',
   menu: 'M4 6h16M4 12h16M4 18h16',
   close: 'M6 6l12 12M18 6L6 18',

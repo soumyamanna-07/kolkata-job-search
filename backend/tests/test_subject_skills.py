@@ -59,6 +59,8 @@ class TestTable(unittest.TestCase):
             {"name": "Python Programming"},
             {"name": "Programming for Problem Solving*"},
             {"name": "Principles of Management"},
+            {"name": "Programming in C Laboratory"},
+            {"name": "Programming in C++"},
         ], use_ai=False)
         dbms = links(out[0])
         self.assertEqual(dbms["sql"], (0.9, "curriculum"))
@@ -69,6 +71,9 @@ class TestTable(unittest.TestCase):
         self.assertEqual(links(out[3]), {"c": (0.9, "curriculum")})
         self.assertIn("project management", links(out[4]))
         self.assertEqual(out[0].links[0].skill, "sql")           # strongest link first
+        self.assertEqual(links(out[5]), {"c": (0.9, "curriculum")})
+        self.assertNotIn("c", links(out[6]))                     # C++ is not C
+        self.assertIn("c++", links(out[6]))
 
     def test_elective_choices_are_kept_apart(self):
         out = ss.map_subjects([{"name": "Cloud Computing / Computer Vision / Graph Theory",
