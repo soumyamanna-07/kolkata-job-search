@@ -5,6 +5,8 @@ compares the subject table with the text read from the file, fixes subjects and 
 department / batch / semester, then approves it (checked) or removes it (rejected; kept for the record).
 "Delete permanently" erases it completely. Approving archives the older approved syllabus for the same
 college + department + batch + semester, and approves the college if it was new.
+Syllabus links (Stage 1.9): links to the syllabus files colleges publish; the weekly fetcher
+(scripts/fetch_syllabi.py) reads them and puts new files in the Waiting list.
 Every decision is saved in the audit log.
 """
 from typing import Literal, Optional
@@ -27,7 +29,7 @@ RAW_TEXT_SHOWN = 30000          # characters of the file's text shown to the adm
 
 LIST_SQL = """
 select s.id, s.college_id, c.name as college_name, c.status as college_status, s.department, s.program, s.batch,
-       s.semester, s.source, s.status, s.file_name, s.review_note, s.created_at, s.reviewed_at,
+       s.semester, s.source, s.status, s.source_url, s.file_name, s.review_note, s.created_at, s.reviewed_at,
        u.email as submitted_by_email,
        (select count(*) from public.syllabus_subjects x where x.syllabus_id = s.id) as subjects
 from public.syllabi s join public.colleges c on c.id = s.college_id
@@ -62,6 +64,29 @@ class CollegeUpdate(BaseModel):
     city: Optional[str] = Field(None, max_length=80)
     website: Optional[str] = Field(None, max_length=500, pattern=r"^https?://")
     syllabus_url: Optional[str] = Field(None, max_length=500, pattern=r"^https?://")
+
+
+class SourceIn(BaseModel):
+    college_id: UUID
+    url: str = Field(min_length=10, max_length=500, pattern=r"^https?://\S+$")
+    department: str = Field(min_length=2, max_length=120)
+    batch: Optional[str] = Field(None, max_length=40)
+    semester: Optional[int] = Field(None, ge=1, le=10)            # empty = the whole course
+
+
+class SourceUpdate(BaseModel):
+    url: Optional[str] = Field(None, min_length=10, max_length=500, pattern=r"^https?://\S+$")
+    department: Optional[str] = Field(None, min_length=2, max_length=120)
+    batch: Optional[str] = Field(None, max_length=40)
+    semester: Optional[int] = Field(None, ge=1, le=10)
+    enabled: Optional[bool] = None
+
+
+SOURCE_SQL = """
+select s.id, s.college_id, c.name as college_name, s.url, s.department, s.batch, s.semester, s.enabled,
+       s.last_checked_at, s.last_status, s.last_error, s.created_at
+from public.syllabus_sources s join public.colleges c on c.id = s.college_id
+"""
 
 
 def _one(conn: psycopg.Connection, syllabus_id: UUID) -> dict:
@@ -171,6 +196,85 @@ def delete_syllabus(syllabus_id: UUID, admin: CurrentUser = Depends(admin_only),
         conn.execute("delete from public.syllabi where id = %s", (syllabus_id,))
         _log(conn, admin, "delete_syllabus", "syllabi", str(syllabus_id),
              {"college": row["college_name"], "department": row["department"], "status": row["status"]})
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- syllabus links (fetched weekly)
+def _source(conn: psycopg.Connection, source_id: UUID) -> dict:
+    with conn.cursor(row_factory=dict_row) as cur:
+        row = cur.execute(SOURCE_SQL + " where s.id = %s", (source_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Syllabus link not found")
+    return row
+
+
+def _tidy(changes: dict) -> dict:
+    if changes.get("department") is not None:
+        changes["department"] = " ".join(changes["department"].split())
+    if "batch" in changes:
+        changes["batch"] = (changes["batch"] or "").strip() or None
+    if changes.get("url") is not None:
+        changes["url"] = changes["url"].strip()
+    return changes
+
+
+@router.get("/syllabus-sources")
+def list_sources(admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = Depends(get_conn)):
+    """Links to college syllabus files, with what the last weekly check found."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        return cur.execute(SOURCE_SQL + " order by c.name, lower(s.department), s.created_at").fetchall()
+
+
+@router.post("/syllabus-sources", status_code=201)
+def add_source(body: SourceIn, admin: CurrentUser = Depends(admin_only),
+               conn: psycopg.Connection = Depends(get_conn)):
+    """Add a link to a syllabus PDF / Word file; the next weekly check reads it."""
+    data = _tidy(body.model_dump())
+    college = conn.execute("select status from public.colleges where id = %s", (data["college_id"],)).fetchone()
+    if college is None or college[0] == "rejected":
+        raise HTTPException(404, "College not found")
+    try:
+        with conn.transaction():
+            sid = conn.execute(
+                """insert into public.syllabus_sources (college_id, url, department, batch, semester, created_by)
+                   values (%s, %s, %s, %s, %s, %s) returning id""",
+                (data["college_id"], data["url"], data["department"], data["batch"], data["semester"],
+                 admin.id)).fetchone()[0]
+            _log(conn, admin, "add_syllabus_source", "syllabus_sources", str(sid), {"url": data["url"]})
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(409, "This college already has this link")
+    return _source(conn, sid)
+
+
+@router.patch("/syllabus-sources/{source_id}")
+def update_source(source_id: UUID, body: SourceUpdate, admin: CurrentUser = Depends(admin_only),
+                  conn: psycopg.Connection = Depends(get_conn)):
+    """Change a link, or switch it off / on."""
+    changes = _tidy(body.model_dump(exclude_unset=True))
+    for key in ("url", "department", "enabled"):
+        if key in changes and changes[key] is None:
+            raise HTTPException(422, f"{key} cannot be empty")
+    if not changes:
+        raise HTTPException(422, "Nothing to change")
+    _source(conn, source_id)
+    sets = ", ".join(f"{k} = %s" for k in changes)
+    try:
+        with conn.transaction():
+            conn.execute(f"update public.syllabus_sources set {sets} where id = %s", (*changes.values(), source_id))
+            _log(conn, admin, "update_syllabus_source", "syllabus_sources", str(source_id), changes)
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(409, "This college already has this link")
+    return _source(conn, source_id)
+
+
+@router.delete("/syllabus-sources/{source_id}", status_code=204)
+def delete_source(source_id: UUID, admin: CurrentUser = Depends(admin_only),
+                  conn: psycopg.Connection = Depends(get_conn)):
+    """Remove a link. Syllabi already fetched from it stay (they have their own status)."""
+    row = _source(conn, source_id)
+    with conn.transaction():
+        conn.execute("delete from public.syllabus_sources where id = %s", (source_id,))
+        _log(conn, admin, "delete_syllabus_source", "syllabus_sources", str(source_id), {"url": row["url"]})
     return Response(status_code=204)
 
 

@@ -2,6 +2,7 @@
 // Syllabi from logged-in users are used at once ("in use, not checked"). Check the subject table
 // against the text read from the file, fix it if needed, then approve it or remove it.
 // "Delete permanently" erases a syllabus completely (e.g. a test upload).
+// Syllabus links: college syllabus files that the weekly fetcher reads into the Waiting list.
 import { useCallback, useEffect, useState } from 'react'
 import AdminTabs from '../components/AdminTabs'
 import Modal from '../components/Modal'
@@ -94,6 +95,12 @@ function SyllabusCheck({ id, onDone, onClose }) {
     <div className="p-4 sm:p-5 bg-paper border-t border-gray-200 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="text-sm text-gray-700">
+          {data.source_url && (
+            <span className="block">
+              Fetched from the college website:{' '}
+              <a href={data.source_url} target="_blank" rel="noreferrer" className="text-dusk underline break-all">{data.source_url}</a>
+            </span>
+          )}
           File: <strong>{data.file_name || 'not kept'}</strong> {'\u00b7'} {data.raw_text_length.toLocaleString('en-IN')} characters read
           {data.college_status === 'pending' && <span className="ml-2 px-2 py-0.5 rounded-sm bg-amber-100 text-amber-900">New college: approving this also approves the college</span>}
         </p>
@@ -183,6 +190,133 @@ function SyllabusCheck({ id, onDone, onClose }) {
   )
 }
 
+// ---------------------------------------------------------------- syllabus links (read every week)
+const LINK_STATUS = {
+  new: ['New file added to Waiting', 'bg-green-100 text-green-800'],
+  unchanged: ['No change', 'bg-gray-100 text-gray-600'],
+  blocked: ['Not allowed / no answer', 'bg-amber-100 text-amber-900'],
+  error: ['Problem', 'bg-red-50 text-sindoor'],
+}
+const emptyLink = { college_id: '', department: '', batch: '', semester: '', url: '' }
+
+function SyllabusLinks({ colleges }) {
+  const toast = useToast()
+  const [links, setLinks] = useState(null)
+  const [form, setForm] = useState(emptyLink)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = useCallback(() => {
+    api('/api/admin/syllabus-sources').then(setLinks).catch((e) => setError(e.message))
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  async function call(work, message) {
+    setBusy(true)
+    setError('')
+    try {
+      await work()
+      toast(message)
+      load()
+      return true
+    } catch (e) {
+      setError(e.message)
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function add(e) {
+    e.preventDefault()
+    const body = { college_id: form.college_id, url: form.url.trim(), department: form.department.trim(),
+      batch: form.batch.trim() || null, semester: form.semester === '' ? null : Number(form.semester) }
+    if (await call(() => api('/api/admin/syllabus-sources', { method: 'POST', body }), 'Link added. The next weekly check reads it.')) {
+      setForm({ ...emptyLink, college_id: form.college_id })
+    }
+  }
+
+  const field = (key) => ({ value: form[key], onChange: (e) => setForm({ ...form, [key]: e.target.value }) })
+  const usable = (colleges || []).filter((c) => c.status !== 'rejected')
+
+  return (
+    <section className="mt-10">
+      <h2 className="font-display text-2xl mb-1">Syllabus links</h2>
+      <p className="text-sm text-gray-600 mb-3">
+        Links to syllabus PDF or Word files on college websites. Every week they are read (only when the
+        website&apos;s robots.txt allows it); a new or changed file goes to the Waiting tab above and is used only after you approve it.
+      </p>
+
+      <form onSubmit={add} className="p-4 bg-white border border-gray-200 rounded grid sm:grid-cols-6 gap-3 text-sm">
+        <label className="block sm:col-span-2">College
+          <select required {...field('college_id')} className={input}>
+            <option value="">Choose a college</option>
+            {usable.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <label className="block sm:col-span-2">Department
+          <input required minLength={2} maxLength={120} {...field('department')} placeholder="e.g. CSE (AI & ML)" className={input} />
+        </label>
+        <label className="block">Batch
+          <input maxLength={40} {...field('batch')} placeholder="optional" className={input} />
+        </label>
+        <label className="block">Semester
+          <input type="number" min="1" max="10" {...field('semester')} placeholder="all" className={input} />
+        </label>
+        <label className="block sm:col-span-5">Link to the PDF or Word file
+          <input required type="url" maxLength={500} {...field('url')} placeholder="https://college.edu/.../syllabus.pdf" className={input} />
+        </label>
+        <div className="sm:self-end">
+          <button disabled={busy} className="w-full px-4 py-2 rounded bg-dusk text-white font-semibold disabled:opacity-50">Add link</button>
+        </div>
+      </form>
+      {error && <p className="mt-2 p-2 rounded bg-red-50 text-sindoor text-sm">{error}</p>}
+
+      {links && links.length === 0 && <p className="mt-3 text-sm text-gray-600">No links yet.</p>}
+      {links && links.length > 0 && (
+        <ul className="mt-3 bg-white border border-gray-200 rounded divide-y divide-gray-200">
+          {links.map((l) => {
+            const [label, style] = LINK_STATUS[l.last_status] || ['Not checked yet', 'bg-gray-100 text-gray-600']
+            return (
+              <li key={l.id} className={`p-4 ${l.enabled ? '' : 'opacity-60'}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold">
+                      {l.college_name} {'\u00b7'} {l.department}
+                      <span className="font-normal text-gray-600">
+                        {l.semester ? `, semester ${l.semester}` : ', all semesters'}{l.batch ? `, batch ${l.batch}` : ''}
+                      </span>
+                    </p>
+                    <a href={l.url} target="_blank" rel="noreferrer" className="text-sm text-dusk underline break-all">{l.url}</a>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {l.last_checked_at ? `Last checked ${postedText(l.last_checked_at)?.toLowerCase()}` : 'Read at the next weekly check'}
+                      {l.enabled ? '' : ' (switched off)'}
+                    </p>
+                    {l.last_error && <p className="text-sm text-sindoor mt-1">{l.last_error}</p>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className={`px-2 py-0.5 rounded-sm ${style}`}>{label}</span>
+                    <button disabled={busy} onClick={() => call(() => api(`/api/admin/syllabus-sources/${l.id}`,
+                      { method: 'PATCH', body: { enabled: !l.enabled } }), l.enabled ? 'Link switched off.' : 'Link switched on.')}
+                            className="px-3 py-1 rounded border border-gray-300 hover:border-dusk disabled:opacity-50">
+                      {l.enabled ? 'Switch off' : 'Switch on'}
+                    </button>
+                    <button disabled={busy} onClick={() => call(() => api(`/api/admin/syllabus-sources/${l.id}`, { method: 'DELETE' }),
+                      'Link removed. Syllabi already fetched from it stay.')}
+                            className="px-3 py-1 rounded border border-gray-300 hover:bg-red-50 disabled:opacity-50">
+                      Remove link
+                    </button>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 // ---------------------------------------------------------------- colleges
 function College({ c, onSaved }) {
   const toast = useToast()
@@ -264,8 +398,8 @@ export default function AdminSyllabiPage() {
       <section>
         <h2 className="font-display text-2xl mb-1">Syllabi</h2>
         <p className="text-sm text-gray-600 mb-3">
-          Sent by logged-in students and faculty and used at once. Check them here: approved ones are shown first,
-          removed ones are no longer used.
+          Sent by logged-in students and faculty (used at once), or fetched from college websites (Waiting: used only
+          after you approve). Approved ones are shown first; removed ones are no longer used.
         </p>
         <div className="flex flex-wrap gap-1 mb-3" role="tablist" aria-label="Syllabus status">
           {STATUSES.map(([v, t]) => (
@@ -285,8 +419,9 @@ export default function AdminSyllabiPage() {
                   <div className="min-w-0">
                     <p className="font-semibold">{s.college_name} {'\u00b7'} {s.department}</p>
                     <p className="text-sm text-gray-600">
-                      {semesterText(s)}{s.batch ? `, batch ${s.batch}` : ''} {'\u00b7'} {s.subjects} subjects {'\u00b7'} sent{' '}
-                      {postedText(s.created_at)?.toLowerCase()}{s.submitted_by_email ? ` by ${s.submitted_by_email}` : ''}
+                      {semesterText(s)}{s.batch ? `, batch ${s.batch}` : ''} {'\u00b7'} {s.subjects} subjects {'\u00b7'} {s.source === 'website' ? 'fetched' : 'sent'}{' '}
+                      {postedText(s.created_at)?.toLowerCase()}
+                      {s.source === 'website' ? ' from the college website' : s.submitted_by_email ? ` by ${s.submitted_by_email}` : ''}
                     </p>
                     {s.review_note && <p className="text-sm text-gray-700 mt-1">Note: {s.review_note}</p>}
                   </div>
@@ -304,6 +439,8 @@ export default function AdminSyllabiPage() {
           </ul>
         )}
       </section>
+
+      <SyllabusLinks colleges={colleges} />
 
       <section className="mt-10">
         <h2 className="font-display text-2xl mb-1">Colleges</h2>

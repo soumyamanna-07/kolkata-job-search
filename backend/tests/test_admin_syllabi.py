@@ -155,6 +155,37 @@ class TestAdminSyllabi(unittest.TestCase):
         listed = [x["name"] for x in c.get("/api/syllabus/colleges").json()]
         self.assertIn("Example College of Engineering", listed)                     # approved with its syllabus
 
+    def test_4_syllabus_links(self):
+        c, h = self.client, self.h["admin"]
+        url = "https://example.edu/syllabus/cse-r22.pdf"
+        body = {"college_id": self.tmsl, "url": url, "department": "  CSE   (AI & ML) ", "batch": " ", "semester": None}
+        self.assertEqual(c.get("/api/admin/syllabus-sources", headers=self.h["asha"]).status_code, 403)
+        self.assertEqual(c.post("/api/admin/syllabus-sources", json=body, headers=self.h["asha"]).status_code, 403)
+        r = c.post("/api/admin/syllabus-sources", json=body, headers=h)
+        self.assertEqual(r.status_code, 201, r.text)
+        link = r.json()
+        self.assertEqual((link["department"], link["batch"], link["enabled"], link["last_status"], link["college_name"]),
+                         ("CSE (AI & ML)", None, True, None, "Techno Main Salt Lake"))
+        self.assertEqual(c.post("/api/admin/syllabus-sources", json={**body, "url": url.upper().replace("HTTPS", "https")},
+                                headers=h).status_code, 409)                         # same link twice
+        for bad in ({"url": "ftp://example.edu/x.pdf"}, {"url": "https://exa mple.edu/x.pdf"}, {"semester": 11},
+                    {"college_id": str(uuid.uuid4())}):
+            self.assertIn(c.post("/api/admin/syllabus-sources", json={**body, **bad}, headers=h).status_code, (404, 422))
+
+        r = c.patch(f"/api/admin/syllabus-sources/{link['id']}", json={"enabled": False, "semester": 5}, headers=h)
+        self.assertEqual((r.json()["enabled"], r.json()["semester"]), (False, 5))
+        self.assertEqual(c.patch(f"/api/admin/syllabus-sources/{link['id']}", json={"url": None}, headers=h).status_code, 422)
+        self.assertEqual(c.patch(f"/api/admin/syllabus-sources/{link['id']}", json={}, headers=h).status_code, 422)
+        self.assertEqual([x["id"] for x in c.get("/api/admin/syllabus-sources", headers=h).json()], [link["id"]])
+
+        self.assertEqual(c.delete(f"/api/admin/syllabus-sources/{link['id']}", headers=h).status_code, 204)
+        self.assertEqual(c.delete(f"/api/admin/syllabus-sources/{link['id']}", headers=h).status_code, 404)
+        self.assertEqual(c.get("/api/admin/syllabus-sources", headers=h).json(), [])
+        actions = [a[0] for a in self.db.execute("select action from public.admin_actions "
+                                                 "where target_table = 'syllabus_sources'").fetchall()]
+        for action in ("add_syllabus_source", "update_syllabus_source", "delete_syllabus_source"):
+            self.assertIn(action, actions)
+
 
 if __name__ == "__main__":
     unittest.main()
