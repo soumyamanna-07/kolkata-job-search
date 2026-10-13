@@ -124,6 +124,15 @@ class TestJobUpdateApi(unittest.TestCase):
         finally:
             self.db.execute("delete from public.pipeline_runs where id = %s", (run_id,))
 
+    def test_switched_off_on_small_server(self):
+        wait_until_done(self.runner)
+        with mock.patch.object(config, "SERVER_JOB_UPDATES", False):
+            r = self.client.post("/api/admin/job-update", json={"mode": "quick"}, headers=self.auth["admin"])
+        self.assertEqual(r.status_code, 503)
+        self.assertIn("switched off", r.json()["detail"])
+        self.assertFalse(self.client.get("/api/admin/job-update", headers=self.auth["admin"]).json()["running"])
+        self.assertEqual(self.client.head("/health").status_code, 200)      # uptime monitors check with HEAD
+
 
 if __name__ == "__main__":
     unittest.main()

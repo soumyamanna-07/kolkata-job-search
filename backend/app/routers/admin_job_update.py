@@ -11,6 +11,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from app import config
 from app.auth import CurrentUser
 from app.db import get_conn
 from app.job_update import runner
@@ -19,6 +20,8 @@ from app.routers.admin import _log, admin_only
 router = APIRouter(prefix="/api/admin/job-update", tags=["admin"])
 
 BUSY = "An update is already running. Wait for it to finish, then try again."
+SWITCHED_OFF = ("Updating jobs from the website is switched off on this server (not enough memory). "
+                "Run the update from your computer or wait for the scheduled update.")
 # a pipeline run started in the last hour and not finished (for example the scheduled one) counts as busy
 OTHER_RUN_SQL = """select exists (select 1 from public.pipeline_runs
                    where status = 'running' and started_at > now() - interval '1 hour')"""
@@ -51,6 +54,8 @@ def job_update_status(admin: CurrentUser = Depends(admin_only), conn: psycopg.Co
 @router.post("", response_model=JobUpdateStatus, status_code=status.HTTP_202_ACCEPTED)
 def start_job_update(body: JobUpdateIn, admin: CurrentUser = Depends(admin_only),
                      conn: psycopg.Connection = Depends(get_conn)):
+    if not config.SERVER_JOB_UPDATES:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, SWITCHED_OFF)
     if runner.status()["running"] or _other_run(conn):
         raise HTTPException(status.HTTP_409_CONFLICT, BUSY)
     if not runner.start(body.mode):

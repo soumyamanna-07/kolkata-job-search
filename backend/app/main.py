@@ -56,7 +56,8 @@ app.include_router(admin_companies.router)
 app.include_router(admin_job_update.router)
 
 
-@app.get("/health", tags=["system"])
+# HEAD too: uptime monitors (UptimeRobot) check with HEAD requests
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["system"])
 def health(conn: psycopg.Connection = Depends(db.get_conn)):
     """Is the API up, and can it reach the database?"""
     conn.execute("select 1")
