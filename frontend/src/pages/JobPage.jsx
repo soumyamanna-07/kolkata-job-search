@@ -5,12 +5,17 @@ import { ReportButton, SaveButton, ShareButton } from '../components/JobActions'
 import { DirectBadge, facts } from '../components/JobCard'
 import SourceCredit from '../components/SourceCredit'
 import { api, trackEvent } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { isDirect, postedText, SOURCE_CREDITS } from '../lib/format'
 import Icon from '../lib/icons'
+import { loginUrl } from '../lib/next'
+import { useToast } from '../lib/toast'
 
 export default function JobPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const toast = useToast()
   const [job, setJob] = useState(null)
   const [error, setError] = useState('')
 
@@ -41,6 +46,14 @@ export default function JobPage() {
   const credit = SOURCE_CREDITS[job.source]
   const direct = isDirect(job)
   const posted = postedText(job.posted_at)
+
+  // Apply: the job opens in a new tab, and goes into the user's tracker (My jobs > My applications)
+  function applied() {
+    trackEvent(job.id, 'click_apply', { source_page: 'job_page' })
+    api(`/api/me/applications/${job.id}`, { method: 'PUT' })
+      .then(() => toast('Added to My applications'))
+      .catch(() => {})
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
@@ -106,16 +119,24 @@ export default function JobPage() {
         <aside className="lg:sticky lg:top-24 space-y-4">
           {!closed && (
             <div className="bg-white border border-gray-200 rounded p-5">
-              <a href={job.apply_url} target="_blank" rel="noopener noreferrer nofollow"
-                 onClick={() => trackEvent(job.id, 'click_apply', { source_page: 'job_page' })}
-                 className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded bg-taxi text-ink font-semibold hover:bg-taxi-deep">
-                {direct ? 'Apply on company site' : `Apply on ${credit.name}`}
-                <Icon name="external" className="w-4 h-4" />
-              </a>
+              {user ? (
+                <a href={job.apply_url} target="_blank" rel="noopener noreferrer nofollow" onClick={applied}
+                   className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded bg-taxi text-ink font-semibold hover:bg-taxi-deep">
+                  {direct ? 'Apply on company site' : `Apply on ${credit.name}`}
+                  <Icon name="external" className="w-4 h-4" />
+                </a>
+              ) : (
+                <Link to={loginUrl(`/jobs/${job.id}`)}
+                      className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded bg-taxi text-ink font-semibold hover:bg-taxi-deep">
+                  Log in to apply
+                </Link>
+              )}
               <p className="mt-3 text-xs text-gray-500">
-                {direct
-                  ? 'Opens the employer\'s own job page.'
-                  : <>Opens the job on {credit.name}, which links to the employer. <SourceCredit credit={credit} className="align-middle underline" /></>}
+                {!user
+                  ? 'Free, one click with Google. We keep track of every job you apply to, so you can follow up.'
+                  : direct
+                    ? 'Opens the employer\'s own job page. We add it to My applications.'
+                    : <>Opens the job on {credit.name}, which links to the employer. <SourceCredit credit={credit} className="align-middle underline" /></>}
               </p>
             </div>
           )}

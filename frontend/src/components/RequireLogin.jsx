@@ -1,9 +1,12 @@
 // Pages that need an account: show a short message with a Log in button instead of the page.
-import { Link } from 'react-router-dom'
+// After logging in, the user comes back to the same page.
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { loginUrl } from '../lib/next'
 
 export default function RequireLogin({ what, children }) {
   const { ready, user } = useAuth()
+  const location = useLocation()
   if (!ready) return null
   if (user) return children
   return (
@@ -12,7 +15,8 @@ export default function RequireLogin({ what, children }) {
       <div className="p-8">
         <p className="font-display text-2xl">Log in to see {what}</p>
         <p className="mt-2 text-sm text-gray-600">It's free, and takes a minute.</p>
-        <Link to="/login" className="inline-block mt-5 px-6 py-2.5 rounded bg-taxi text-ink font-semibold hover:bg-taxi-deep">
+        <Link to={loginUrl(location.pathname + location.search)}
+              className="inline-block mt-5 px-6 py-2.5 rounded bg-taxi text-ink font-semibold hover:bg-taxi-deep">
           Log in or create an account
         </Link>
       </div>

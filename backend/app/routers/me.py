@@ -1,17 +1,18 @@
-"""Endpoints for the logged-in user: profile, privacy consent, delete account, saved jobs, activity."""
+"""Endpoints for the logged-in user: profile, privacy consent, delete account, saved jobs, applications, activity."""
+from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from psycopg.rows import dict_row
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app import account
 from app.auth import CurrentUser, get_current_user, get_optional_user
 from app.db import get_conn
 from app.job_search import summary_columns
-from app.schemas import JobEventIn, Profile, ProfileUpdate, SavedJob
+from app.schemas import JobEventIn, JobSummary, Profile, ProfileUpdate, SavedJob
 
 router = APIRouter(prefix="/api", tags=["me"])
 
@@ -101,6 +102,84 @@ def unsave_job(job_id: UUID, user: CurrentUser = Depends(get_current_user),
     if deleted:
         conn.execute("insert into public.job_events (user_id, job_id, event_type) values (%s, %s, 'unsave')",
                      (user.id, job_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------- my applications
+ApplicationStatus = Literal["applied", "interview", "offer", "rejected", "no_reply"]
+
+
+class Application(JobSummary):
+    status: str                                # the job itself: open / closed
+    application_status: ApplicationStatus      # where the user is: applied, interview, offer ...
+    note: Optional[str] = None
+    applied_at: datetime
+    updated_at: datetime
+
+
+class ApplicationUpdate(BaseModel):
+    status: Optional[ApplicationStatus] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+APPLICATION_SQL = f"""select {summary_columns("j")}, j.status, a.status as application_status, a.note,
+                             a.applied_at, a.updated_at
+                      from public.applications a join public.jobs j on j.id = a.job_id
+                      where a.user_id = %s"""
+
+
+def _application(conn: psycopg.Connection, user_id: str, job_id: UUID) -> Application:
+    with conn.cursor(row_factory=dict_row) as cur:
+        row = cur.execute(APPLICATION_SQL + " and a.job_id = %s", (user_id, job_id)).fetchone()
+    if row is None:
+        raise HTTPException(404, "This job is not in your applications")
+    return Application(**row)
+
+
+@router.get("/me/applications", response_model=list[Application])
+def list_applications(user: CurrentUser = Depends(get_current_user), conn: psycopg.Connection = Depends(get_conn)):
+    """Your applications, most recently changed first. Closed jobs stay in the list."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute(APPLICATION_SQL + " order by a.updated_at desc limit 500", (user.id,)).fetchall()
+    return [Application(**r) for r in rows]
+
+
+@router.put("/me/applications/{job_id}", response_model=Application)
+def add_application(job_id: UUID, user: CurrentUser = Depends(get_current_user),
+                    conn: psycopg.Connection = Depends(get_conn)):
+    """Add a job to your applications (done when you press Apply). Pressing again keeps your status."""
+    if conn.execute("select 1 from public.jobs where id = %s", (job_id,)).fetchone() is None:
+        raise HTTPException(404, "Job not found")
+    conn.execute("insert into public.applications (user_id, job_id) values (%s, %s) on conflict do nothing",
+                 (user.id, job_id))
+    return _application(conn, user.id, job_id)
+
+
+@router.patch("/me/applications/{job_id}", response_model=Application)
+def update_application(job_id: UUID, body: ApplicationUpdate, user: CurrentUser = Depends(get_current_user),
+                       conn: psycopg.Connection = Depends(get_conn)):
+    """Move an application to another stage (interview, offer, rejected, no reply) and/or change its note."""
+    changes, params = [], {"u": user.id, "j": job_id}
+    if body.status is not None:
+        changes.append("status = %(status)s")
+        params["status"] = body.status
+    if "note" in body.model_fields_set:
+        changes.append("note = %(note)s")
+        params["note"] = (body.note or "").strip() or None
+    if not changes:
+        raise HTTPException(422, "Send a status or a note to change")
+    updated = conn.execute(f"update public.applications set {', '.join(changes)} "
+                           "where user_id = %(u)s and job_id = %(j)s returning 1", params).fetchone()
+    if updated is None:
+        raise HTTPException(404, "This job is not in your applications")
+    return _application(conn, user.id, job_id)
+
+
+@router.delete("/me/applications/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_application(job_id: UUID, user: CurrentUser = Depends(get_current_user),
+                       conn: psycopg.Connection = Depends(get_conn)):
+    """Remove a job from your applications."""
+    conn.execute("delete from public.applications where user_id = %s and job_id = %s", (user.id, job_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

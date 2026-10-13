@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import Icon from '../lib/icons'
 import { useSaved } from '../lib/saved'
 import { useTheme } from '../lib/theme'
+import LoginNudge from './LoginNudge'
 
 // for problems, wrong or fake jobs, and requests from companies to remove a listing
 const CONTACT_EMAIL = 'kolkatalivejob@gmail.com'
@@ -14,6 +15,7 @@ const LINKS = [
   ['/match', 'Match my CV', 'file'],
   ['/ask', 'Ask AI', 'spark'],
   ['/insights', 'Insights', 'chart'],
+  ['/syllabus', 'Skill Gap Analyser', 'book'],
 ]
 
 function navClass({ isActive }) {
@@ -105,6 +107,7 @@ export default function Layout() {
       <main id="main" className="flex-1">
         <Outlet />
       </main>
+      <LoginNudge />
 
       <footer className="footer-night text-steel">
         <div className="laal-paar" />
@@ -117,6 +120,7 @@ export default function Layout() {
             <Link to="/match" className="hover:text-white">Match my CV</Link>
             <Link to="/ask" className="hover:text-white">Ask AI about jobs</Link>
             <Link to="/insights" className="hover:text-white">Job market insights</Link>
+            <Link to="/syllabus" className="hover:text-white">Tech Job Market Intelligence &amp; Skill Gap Analyser</Link>
             <Link to="/share-job" className="hover:text-white">Share a job (students and TPOs)</Link>
           </div>
           <p>

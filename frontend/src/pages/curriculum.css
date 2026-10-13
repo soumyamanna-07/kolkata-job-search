@@ -1,0 +1,72 @@
+/* Curriculum gap report: status colours for "is this skill taught?".
+   Checked with the colour-blindness validator for light and dark; every bar also has its status
+   written in words, so colour is never the only signal. */
+.cg {
+  --cg-covered: #13894f;
+  --cg-elective: #3f73c8;
+  --cg-partial: #c98500;
+  --cg-missing: #c8323a;
+  --cg-track: #e7ebee;
+  --cg-whisker: #1b1f24;
+}
+html[data-theme="dark"] .cg {
+  --cg-covered: #2f9e68;
+  --cg-elective: #5a86d6;
+  --cg-partial: #c08a12;
+  --cg-missing: #e0555f;
+  --cg-track: #22323f;
+  --cg-whisker: #e6ecf2;
+}
+.cg-covered { background-color: var(--cg-covered); }
+.cg-elective { background-color: var(--cg-elective); }
+.cg-partial { background-color: var(--cg-partial); }
+.cg-missing { background-color: var(--cg-missing); }
+.cg-track { background-color: var(--cg-track); }
+.cg-whisker { background-color: var(--cg-whisker); }
+
+/* the tooltip shows on hover and on keyboard focus */
+.cg-row:hover .cg-tip,
+.cg-row:focus-visible .cg-tip,
+.cg-col:hover .cg-tip,
+.cg-col:focus-visible .cg-tip { display: block; }
+
+/* "Print for HOD": only the report is printed, always in light colours on white paper
+   (even when the site is in dark display), so it is easy to read and cheap to print */
+@media print {
+  header, footer, nav, .no-print, .login-nudge { display: none !important; }
+  html[data-theme="dark"] {
+    color-scheme: light;
+    --color-paper: #f3f4f1;
+    --color-ink: #1b1f24;
+    --color-money: #13794a;
+    --color-hooghly: #0e7c7b;
+    --surface: #ffffff;
+    --link: #17324a;
+    --color-gray-50: #f9fafb;
+    --color-gray-100: #f3f4f6;
+    --color-gray-200: #e5e7eb;
+    --color-gray-300: #d1d5db;
+    --color-gray-400: #9ca3af;
+    --color-gray-500: #6b7280;
+    --color-gray-600: #4b5563;
+    --color-gray-700: #374151;
+    --color-gray-800: #1f2937;
+    --color-gray-900: #111827;
+  }
+  html[data-theme="dark"] .cg {
+    --cg-covered: #13894f;
+    --cg-elective: #3f73c8;
+    --cg-partial: #c98500;
+    --cg-missing: #c8323a;
+    --cg-track: #e7ebee;
+    --cg-whisker: #1b1f24;
+  }
+  html, body, main { background: #fff !important; }
+  html[data-theme="dark"] .bar { background-color: #17324a; }
+  html[data-theme="dark"] .text-hooghly { color: #0e7c7b; }
+  .cg-print-page { max-width: none !important; padding: 0 !important; }
+  .cg section, .cg .print-avoid { break-inside: avoid; }
+  .cg .cg-tip { display: none !important; }
+  .cg details:not([open]) { display: none !important; }      /* closed extras (e.g. "Show as a table") are not printed */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
