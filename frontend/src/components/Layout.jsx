@@ -6,6 +6,9 @@ import Icon from '../lib/icons'
 import { useSaved } from '../lib/saved'
 import { useTheme } from '../lib/theme'
 
+// for problems, wrong or fake jobs, and requests from companies to remove a listing
+const CONTACT_EMAIL = 'kolkatalivejob@gmail.com'
+
 const LINKS = [
   ['/', 'Jobs', 'briefcase'],
   ['/match', 'Match my CV', 'file'],
@@ -120,6 +123,13 @@ export default function Layout() {
             A final-year project at Techno Main Salt Lake. Only live jobs are shown: still open, and posted in the last 60 days.
             Always apply on the employer's or job site's own page, and never pay to get a job.
           </p>
+        </div>
+        <div className="max-w-6xl mx-auto px-4 pb-6 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+          <a href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Problem on Kolkata Live Jobs')}`}
+             className="hover:text-white underline underline-offset-2">
+            Report a problem or ask us to remove a job: {CONTACT_EMAIL}
+          </a>
+          <a href="/privacy.html" className="hover:text-white underline underline-offset-2">Privacy policy</a>
         </div>
       </footer>
     </div>
