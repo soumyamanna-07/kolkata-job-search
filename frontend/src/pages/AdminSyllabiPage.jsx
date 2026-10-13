@@ -197,9 +197,9 @@ const LINK_STATUS = {
   blocked: ['Not allowed / no answer', 'bg-amber-100 text-amber-900'],
   error: ['Problem', 'bg-red-50 text-sindoor'],
 }
-const emptyLink = { college_id: '', department: '', batch: '', semester: '', url: '' }
+const emptyLink = { college: '', department: '', batch: '', semester: '', url: '' }
 
-function SyllabusLinks({ colleges }) {
+function SyllabusLinks({ colleges, onCollegeAdded }) {
   const toast = useToast()
   const [links, setLinks] = useState(null)
   const [form, setForm] = useState(emptyLink)
@@ -229,10 +229,16 @@ function SyllabusLinks({ colleges }) {
 
   async function add(e) {
     e.preventDefault()
-    const body = { college_id: form.college_id, url: form.url.trim(), department: form.department.trim(),
-      batch: form.batch.trim() || null, semester: form.semester === '' ? null : Number(form.semester) }
-    if (await call(() => api('/api/admin/syllabus-sources', { method: 'POST', body }), 'Link added. The next weekly check reads it.')) {
-      setForm({ ...emptyLink, college_id: form.college_id })
+    const name = form.college.trim().replace(/\s+/g, ' ')
+    const known = usable.find((c) => [c.name, c.short_name].some((n) => n && n.toLowerCase() === name.toLowerCase()))
+    const body = { ...(known ? { college_id: known.id } : { college_name: name }), url: form.url.trim(),
+      department: form.department.trim(), batch: form.batch.trim() || null,
+      semester: form.semester === '' ? null : Number(form.semester) }
+    const message = known ? 'Link added. The next weekly check reads it.'
+      : `Link added, and "${name}" added to the colleges. The next weekly check reads it.`
+    if (await call(() => api('/api/admin/syllabus-sources', { method: 'POST', body }), message)) {
+      setForm({ ...emptyLink, college: form.college })
+      if (!known) onCollegeAdded()
     }
   }
 
@@ -243,16 +249,17 @@ function SyllabusLinks({ colleges }) {
     <section className="mt-10">
       <h2 className="font-display text-2xl mb-1">Syllabus links</h2>
       <p className="text-sm text-gray-600 mb-3">
-        Links to syllabus PDF or Word files on college websites. Every week they are read (only when the
+        Links to syllabus PDF or Word files on college websites. Type any college: a new name is added to the list below. Every week they are read (only when the
         website&apos;s robots.txt allows it); a new or changed file goes to the Waiting tab above and is used only after you approve it.
       </p>
 
       <form onSubmit={add} className="p-4 bg-white border border-gray-200 rounded grid sm:grid-cols-6 gap-3 text-sm">
         <label className="block sm:col-span-2">College
-          <select required {...field('college_id')} className={input}>
-            <option value="">Choose a college</option>
-            {usable.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <input required minLength={3} maxLength={200} list="admin-college-names" {...field('college')}
+                 placeholder="Type any college, e.g. IIEST Shibpur" className={input} />
+          <datalist id="admin-college-names">
+            {usable.map((c) => <option key={c.id} value={c.name}>{c.short_name || undefined}</option>)}
+          </datalist>
         </label>
         <label className="block sm:col-span-2">Department
           <input required minLength={2} maxLength={120} {...field('department')} placeholder="e.g. CSE (AI & ML)" className={input} />
@@ -440,7 +447,7 @@ export default function AdminSyllabiPage() {
         )}
       </section>
 
-      <SyllabusLinks colleges={colleges} />
+      <SyllabusLinks colleges={colleges} onCollegeAdded={load} />
 
       <section className="mt-10">
         <h2 className="font-display text-2xl mb-1">Colleges</h2>

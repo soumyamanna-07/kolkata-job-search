@@ -88,6 +88,7 @@ class TestFetchRun(unittest.TestCase):
         subject_skills.clear_cache()
         cls.db = psycopg.connect(TEST_DB, autocommit=True)
         cls.db.execute("delete from public.syllabi")
+        cls.db.execute("delete from public.syllabus_sources")
         cls.college = str(cls.db.execute("insert into public.colleges (name, status) values (%s, 'approved') "
                                          "returning id", (f"Fetch Test College {uuid.uuid4().hex[:6]}",)).fetchone()[0])
 

@@ -34,6 +34,7 @@ class TestAdminSyllabi(unittest.TestCase):
         syllabus.submissions_per_day._calls.clear()
         db = cls.db = psycopg.connect(TEST_DB, autocommit=True)
         db.execute("delete from public.syllabi")
+        db.execute("delete from public.syllabus_sources")
         db.execute("delete from public.colleges where name <> 'Techno Main Salt Lake'")
         tag = uuid.uuid4().hex[:6]
         cls.ids = {name: str(uuid.uuid4()) for name in ("admin", "asha")}
@@ -52,6 +53,7 @@ class TestAdminSyllabi(unittest.TestCase):
         from app import embeddings
         cls.cm.__exit__(None, None, None)
         cls.db.execute("delete from public.syllabi")
+        cls.db.execute("delete from public.syllabus_sources")
         cls.db.execute("delete from public.colleges where name <> 'Techno Main Salt Lake'")
         cls.db.execute("delete from auth.users where id = any(%s::uuid[])", (list(cls.ids.values()),))
         cls.db.close()
@@ -185,6 +187,23 @@ class TestAdminSyllabi(unittest.TestCase):
                                                  "where target_table = 'syllabus_sources'").fetchall()]
         for action in ("add_syllabus_source", "update_syllabus_source", "delete_syllabus_source"):
             self.assertIn(action, actions)
+
+        # any college can be typed: a new name is added (approved), a known name or short name is reused
+        typed = {"url": "https://iiests.example/it.pdf", "department": "IT"}
+        r = c.post("/api/admin/syllabus-sources", json={**typed, "college_name": "  Example  Institute of Technology "},
+                   headers=h)
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(r.json()["college_name"], "Example Institute of Technology")
+        status = self.db.execute("select status from public.colleges where name = 'Example Institute of Technology'")
+        self.assertEqual(status.fetchone()[0], "approved")
+        r = c.post("/api/admin/syllabus-sources", json={**typed, "url": "https://x.example/cse.pdf", "college_name": "tmsl"},
+                   headers=h)
+        self.assertEqual(r.json()["college_id"], self.tmsl)
+        self.db.execute("insert into public.colleges (name, status) values ('Fake Name College', 'rejected')")
+        self.assertEqual(c.post("/api/admin/syllabus-sources", json={**typed, "college_name": "fake name college"},
+                                headers=h).status_code, 409)
+        self.assertEqual(c.post("/api/admin/syllabus-sources", json={k: v for k, v in body.items() if k != "college_id"},
+                                headers=h).status_code, 422)                 # no college at all
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ from app import embeddings
 from app.auth import CurrentUser
 from app.db import get_conn
 from app.routers.admin import _log, admin_only
-from app.routers.syllabus import MAX_SUBJECTS, SubjectIn, _map, _subject_dict
+from app.routers.syllabus import MAX_SUBJECTS, SubjectIn, _college_by_name, _map, _subject_dict
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -67,11 +67,18 @@ class CollegeUpdate(BaseModel):
 
 
 class SourceIn(BaseModel):
-    college_id: UUID
+    college_id: Optional[UUID] = None                             # a college from the list, or
+    college_name: Optional[str] = Field(None, min_length=3, max_length=200)   # any college name (added if new)
     url: str = Field(min_length=10, max_length=500, pattern=r"^https?://\S+$")
     department: str = Field(min_length=2, max_length=120)
     batch: Optional[str] = Field(None, max_length=40)
     semester: Optional[int] = Field(None, ge=1, le=10)            # empty = the whole course
+
+    @model_validator(mode="after")
+    def _college(self) -> "SourceIn":
+        if self.college_id is None and not (self.college_name or "").strip():
+            raise ValueError("choose a college or type its name")
+        return self
 
 
 class SourceUpdate(BaseModel):
@@ -218,6 +225,25 @@ def _tidy(changes: dict) -> dict:
     return changes
 
 
+def _source_college(conn: psycopg.Connection, admin: CurrentUser, college_id: Optional[UUID],
+                    college_name: Optional[str]) -> UUID:
+    if college_id is not None:
+        row = conn.execute("select status from public.colleges where id = %s", (college_id,)).fetchone()
+        if row is None or row[0] == "rejected":
+            raise HTTPException(404, "College not found")
+        return college_id
+    name = " ".join(college_name.split())
+    found = _college_by_name(conn, name)
+    if found is not None:
+        return found
+    if conn.execute("select 1 from public.colleges where lower(name) = lower(%s)", (name,)).fetchone():
+        raise HTTPException(409, "This college name was rejected. Approve it in Colleges below first.")
+    new_id = conn.execute("""insert into public.colleges (name, city, status, created_by)
+                             values (%s, 'Kolkata', 'approved', %s) returning id""", (name, admin.id)).fetchone()[0]
+    _log(conn, admin, "add_college", "colleges", str(new_id), {"name": name})
+    return new_id
+
+
 @router.get("/syllabus-sources")
 def list_sources(admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = Depends(get_conn)):
     """Links to college syllabus files, with what the last weekly check found."""
@@ -228,13 +254,12 @@ def list_sources(admin: CurrentUser = Depends(admin_only), conn: psycopg.Connect
 @router.post("/syllabus-sources", status_code=201)
 def add_source(body: SourceIn, admin: CurrentUser = Depends(admin_only),
                conn: psycopg.Connection = Depends(get_conn)):
-    """Add a link to a syllabus PDF / Word file; the next weekly check reads it."""
+    """Add a link to a syllabus PDF / Word file; the next weekly check reads it.
+    A college typed by name that is not in the list yet is added (approved, since an admin added it)."""
     data = _tidy(body.model_dump())
-    college = conn.execute("select status from public.colleges where id = %s", (data["college_id"],)).fetchone()
-    if college is None or college[0] == "rejected":
-        raise HTTPException(404, "College not found")
     try:
         with conn.transaction():
+            data["college_id"] = _source_college(conn, admin, data["college_id"], data["college_name"])
             sid = conn.execute(
                 """insert into public.syllabus_sources (college_id, url, department, batch, semester, created_by)
                    values (%s, %s, %s, %s, %s, %s) returning id""",
