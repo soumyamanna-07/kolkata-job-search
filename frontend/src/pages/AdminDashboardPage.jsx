@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AdminTabs from '../components/AdminTabs'
+import AdminUsagePanel from '../components/AdminUsagePanel'
 import JobUpdatePanel from '../components/JobUpdatePanel'
 import { api } from '../lib/api'
 import { SOURCE_CREDITS } from '../lib/format'
@@ -45,6 +46,8 @@ export default function AdminDashboardPage() {
 
       {stats && (
         <div className="space-y-6">
+          <AdminUsagePanel />
+
           <JobUpdatePanel onFinished={load} />
 
           <section>
@@ -116,3 +119,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
