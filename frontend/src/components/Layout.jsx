@@ -15,7 +15,7 @@ const LINKS = [
   ['/match', 'Match my CV', 'file'],
   ['/ask', 'Ask AI', 'spark'],
   ['/insights', 'Insights', 'chart'],
-  ['/syllabus', 'Syllabus check', 'book'],
+  ['/syllabus', 'Skill Gap Analyser', 'book'],
 ]
 
 function navClass({ isActive }) {
@@ -120,7 +120,7 @@ export default function Layout() {
             <Link to="/match" className="hover:text-white">Match my CV</Link>
             <Link to="/ask" className="hover:text-white">Ask AI about jobs</Link>
             <Link to="/insights" className="hover:text-white">Job market insights</Link>
-            <Link to="/syllabus" className="hover:text-white">College syllabus check</Link>
+            <Link to="/syllabus" className="hover:text-white">Tech Job Market Intelligence &amp; Skill Gap Analyser</Link>
             <Link to="/share-job" className="hover:text-white">Share a job (students and TPOs)</Link>
           </div>
           <p>

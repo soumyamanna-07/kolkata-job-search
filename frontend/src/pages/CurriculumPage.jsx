@@ -518,9 +518,9 @@ export default function CurriculumPage() {
     <div className="cg cg-print-page max-w-6xl mx-auto px-4 py-8">
       <div className="no-print">
         <p className="text-sm font-semibold text-sindoor">For students and faculty</p>
-        <h1 className="font-display text-4xl sm:text-5xl max-w-3xl">Does your syllabus teach what Kolkata jobs ask for?</h1>
+        <h1 className="font-display text-4xl sm:text-5xl max-w-4xl">Kolkata Tech Job Market Intelligence &amp; Skill Gap Analyser</h1>
         <p className="mt-3 text-gray-700 max-w-2xl">
-          Compare a college syllabus with live job posts: see the gaps, what to learn now, and which extra classes would help most.
+          Does your syllabus teach what Kolkata jobs ask for? Compare it with live job posts: see the gaps, what to learn now, and which extra classes would help most.
         </p>
         <div className="mt-5 inline-flex rounded-full border border-gray-300 p-1 bg-white" role="tablist" aria-label="I am">
           {[['student', 'I am a student'], ['faculty', 'I am faculty or HOD']].map(([v, t]) => (
