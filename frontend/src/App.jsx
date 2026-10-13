@@ -8,6 +8,7 @@ import AdminCompaniesPage from './pages/AdminCompaniesPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import AdminReportsPage from './pages/AdminReportsPage'
 import AdminReviewPage from './pages/AdminReviewPage'
+import AdminSyllabiPage from './pages/AdminSyllabiPage'
 import AdminSystemPage from './pages/AdminSystemPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AlertsPage from './pages/AlertsPage'
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/admin/review" element={<RequireAdmin><AdminReviewPage /></RequireAdmin>} />
         <Route path="/admin/reports" element={<RequireAdmin><AdminReportsPage /></RequireAdmin>} />
         <Route path="/admin/companies" element={<RequireAdmin><AdminCompaniesPage /></RequireAdmin>} />
+        <Route path="/admin/syllabi" element={<RequireAdmin><AdminSyllabiPage /></RequireAdmin>} />
         <Route path="/admin/users" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
         <Route path="/admin/system" element={<RequireAdmin><AdminSystemPage /></RequireAdmin>} />
         <Route path="/login" element={<LoginPage />} />

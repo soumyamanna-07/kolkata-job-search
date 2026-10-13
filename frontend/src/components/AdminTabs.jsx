@@ -6,6 +6,7 @@ const TABS = [
   ['/admin/review', 'Review recruiters and jobs'],
   ['/admin/reports', 'Reports and shared links'],
   ['/admin/companies', 'Companies'],
+  ['/admin/syllabi', 'Syllabi'],
   ['/admin/users', 'Users'],
   ['/admin/system', 'Pipeline and audit log'],
 ]
