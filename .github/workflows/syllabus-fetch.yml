@@ -1,0 +1,58 @@
+# Weekly: reads the syllabus links added in Admin > Syllabi > Syllabus links (Stage 1.9).
+# Only files whose website's robots.txt allows it are downloaded; new or changed files go to the
+# Waiting list and are used only after an admin approves them. Runs on GitHub's free computers.
+# Time is UTC: Saturday 22:41 UTC = Sunday 04:11 IST (a quiet hour for college websites).
+# GitHub runs schedules only from the repository's DEFAULT branch (main).
+name: Fetch college syllabi
+
+on:
+  schedule:
+    - cron: "41 22 * * 6"
+  workflow_dispatch:            # "Run workflow" button on GitHub
+    inputs:
+      use_ai:
+        description: "Use the AI reader when the rules find too few subjects"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: syllabus-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}          # optional; without it only the rules read subjects
+      FASTEMBED_CACHE_PATH: /home/runner/.cache/fastembed
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install libraries
+        run: pip install -r backend/requirements.txt
+
+      - name: Keep the AI model between runs
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/fastembed
+          key: fastembed-all-MiniLM-L6-v2
+
+      - name: Read the syllabus links
+        working-directory: backend
+        env:
+          NO_AI: ${{ (github.event_name == 'workflow_dispatch' && !inputs.use_ai) && '--no-ai' || '' }}
+        run: python -m scripts.fetch_syllabi $NO_AI
