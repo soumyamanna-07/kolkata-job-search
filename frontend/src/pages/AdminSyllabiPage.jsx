@@ -1,8 +1,10 @@
 // Admin: syllabi sent by students and faculty, and the colleges they named.
 // Syllabi from logged-in users are used at once ("in use, not checked"). Check the subject table
 // against the text read from the file, fix it if needed, then approve it or remove it.
+// "Delete permanently" erases a syllabus completely (e.g. a test upload).
 import { useCallback, useEffect, useState } from 'react'
 import AdminTabs from '../components/AdminTabs'
+import Modal from '../components/Modal'
 import SubjectTable, { cleanSubjects } from '../components/SubjectTable'
 import { api } from '../lib/api'
 import { postedText } from '../lib/format'
@@ -32,6 +34,7 @@ function SyllabusCheck({ id, onDone, onClose }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [showText, setShowText] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     api(`/api/admin/syllabi/${id}`).then((d) => {
@@ -58,7 +61,11 @@ function SyllabusCheck({ id, onDone, onClose }) {
     setBusy(true)
     setError('')
     try {
-      if (action === 'save') {
+      if (action === 'delete') {
+        await api(`/api/admin/syllabi/${id}`, { method: 'DELETE' })
+        toast('Syllabus deleted permanently.')
+        onDone()
+      } else if (action === 'save') {
         if (await saveTable()) toast('Subject table saved.')
       } else if (action === 'reject') {
         await api(`/api/admin/syllabi/${id}/review`, { method: 'POST', body: { decision: 'reject', note: form.note.trim() } })
@@ -153,7 +160,25 @@ function SyllabusCheck({ id, onDone, onClose }) {
             Remove
           </button>
         )}
+        <button disabled={busy} onClick={() => setConfirmDelete(true)}
+                className="px-4 py-2 rounded border border-gray-300 bg-white text-sindoor hover:bg-red-50 disabled:opacity-50 sm:ml-auto">
+          Delete permanently
+        </button>
       </div>
+      {confirmDelete && (
+        <Modal title="Delete this syllabus for good?" onClose={() => setConfirmDelete(false)}>
+          <p className="text-sm text-gray-600">
+            {data.college_name}, {data.department}: the subjects and the text read from the file are erased and cannot be
+            brought back. Use Remove instead if you only want to stop it being used.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button onClick={() => { setConfirmDelete(false); run('delete') }} className="px-4 py-2 rounded bg-sindoor text-white font-semibold">
+              Delete permanently
+            </button>
+            <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 rounded border border-gray-300">Keep it</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

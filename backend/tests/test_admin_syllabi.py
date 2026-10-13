@@ -120,7 +120,16 @@ class TestAdminSyllabi(unittest.TestCase):
         self.assertEqual(r.json()["status"], "rejected")
         mine = {m["id"]: m for m in c.get("/api/me/syllabi", headers=self.h["asha"]).json()}
         self.assertEqual((mine[third]["status"], mine[third]["review_note"]), ("rejected", "This is the old syllabus."))
+        # delete permanently: row, subjects and file text are gone; only admins may do it
+        self.assertEqual(c.delete(f"/api/admin/syllabi/{third}", headers=self.h["asha"]).status_code, 403)
+        r = c.delete(f"/api/admin/syllabi/{third}", headers=h)
+        self.assertEqual(r.status_code, 204, r.text)
+        self.assertEqual(self.db.execute("select count(*) from public.syllabi where id = %s", (third,)).fetchone()[0], 0)
+        self.assertEqual(self.db.execute("select count(*) from public.syllabus_subjects where syllabus_id = %s",
+                                         (third,)).fetchone()[0], 0)
+        self.assertEqual(c.delete(f"/api/admin/syllabi/{third}", headers=h).status_code, 404)
         actions = self.db.execute("select action from public.admin_actions where target_table = 'syllabi'").fetchall()
+        self.assertIn(("delete_syllabus",), actions)
         self.assertIn(("approve_syllabus",), actions)
         self.assertIn(("reject_syllabus",), actions)
 

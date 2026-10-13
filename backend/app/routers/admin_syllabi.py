@@ -2,7 +2,8 @@
 
 Syllabi from logged-in users are used at once as "unverified" (not yet checked). Here the admin
 compares the subject table with the text read from the file, fixes subjects and the
-department / batch / semester, then approves it (checked) or removes it (rejected). Approving archives the older approved syllabus for the same
+department / batch / semester, then approves it (checked) or removes it (rejected; kept for the record).
+"Delete permanently" erases it completely. Approving archives the older approved syllabus for the same
 college + department + batch + semester, and approves the college if it was new.
 Every decision is saved in the audit log.
 """
@@ -10,7 +11,7 @@ from typing import Literal, Optional
 from uuid import UUID
 
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field, model_validator
 
@@ -158,6 +159,19 @@ def review_syllabus(syllabus_id: UUID, body: SyllabusReview, admin: CurrentUser 
         _log(conn, admin, "approve_syllabus", "syllabi", str(syllabus_id),
              {"archived": [str(a[0]) for a in archived], "college_approved": row["college_status"] == "pending"})
     return _one(conn, syllabus_id)
+
+
+@router.delete("/syllabi/{syllabus_id}", status_code=204)
+def delete_syllabus(syllabus_id: UUID, admin: CurrentUser = Depends(admin_only),
+                    conn: psycopg.Connection = Depends(get_conn)):
+    """Delete a syllabus for good: the row, its subjects and the text read from the file
+    (e.g. a test upload, or a file someone asked to take down). Kept in the audit log by id only."""
+    row = _one(conn, syllabus_id)
+    with conn.transaction():
+        conn.execute("delete from public.syllabi where id = %s", (syllabus_id,))
+        _log(conn, admin, "delete_syllabus", "syllabi", str(syllabus_id),
+             {"college": row["college_name"], "department": row["department"], "status": row["status"]})
+    return Response(status_code=204)
 
 
 # ---------------------------------------------------------------- colleges
