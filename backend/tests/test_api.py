@@ -58,8 +58,12 @@ class TestJobsApi(unittest.TestCase):
     def test_health(self):
         self.assertEqual(self.client.get("/health").json(), {"status": "ok", "database": "ok"})
 
-    def test_only_open_jobs_newest_first(self):
-        self.assertEqual(self.titles(), ["Python Developer", "Data Analyst", "Sales Executive", "ML Intern"])
+    def test_only_open_jobs_direct_apply_first_then_newest(self):
+        # default sort: jobs that link straight to the employer (lever, greenhouse) first, then job sites
+        self.assertEqual(self.titles(), ["Python Developer", "ML Intern", "Data Analyst", "Sales Executive"])
+        self.assertEqual(self.titles(sort="newest"),
+                         ["Python Developer", "Data Analyst", "Sales Executive", "ML Intern"])
+        self.assertEqual(self.titles(direct_only="true"), ["Python Developer", "ML Intern"])
 
     def test_text_search(self):
         self.assertEqual(self.titles(q="python"), ["Python Developer", "ML Intern"])
@@ -73,7 +77,7 @@ class TestJobsApi(unittest.TestCase):
         self.assertEqual(self.titles(job_type="internship"), ["ML Intern"])
         self.assertEqual(self.titles(work_mode="remote"), ["ML Intern"])
         self.assertEqual(self.titles(posted_within_days=5), ["Python Developer", "Data Analyst"])
-        self.assertEqual(self.titles(experience_years=0), ["Data Analyst", "ML Intern"])
+        self.assertEqual(self.titles(experience_years=0), ["ML Intern", "Data Analyst"])
 
     def test_salary_filter(self):
         # undisclosed salaries included by default

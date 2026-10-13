@@ -25,6 +25,7 @@ class RawJob:
     salary_period: Optional[str] = None  # year / month / hour
     job_type_hint: str = ""              # source's own words, e.g. "Full-time", "Intern"
     work_mode_hint: str = ""             # e.g. "remote", "hybrid", "onsite"
+    remote_from_india: bool = False      # a work-from-home job that someone living in Kolkata can do
 
 
 @dataclass

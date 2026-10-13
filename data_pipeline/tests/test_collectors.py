@@ -4,7 +4,7 @@ from unittest import mock
 
 import requests
 
-from pipeline.collectors import adzuna, greenhouse, lever
+from pipeline.collectors import adzuna, ashby, greenhouse, lever, workable
 
 
 def fake_response(payload, status=200):
@@ -64,6 +64,65 @@ class TestLever(unittest.TestCase):
         session.get.return_value = fake_response({"ok": False})
         r = lever.collect(session, "x", "X", "cid")
         self.assertFalse(r.complete)
+
+
+class TestAshby(unittest.TestCase):
+    def test_parses_jobs(self):
+        session = mock.Mock()
+        session.get.return_value = fake_response({"jobs": [
+            {"id": "a1", "title": "Data Engineer", "location": "Bengaluru", "employmentType": "FullTime",
+             "workplaceType": "Hybrid", "isListed": True, "descriptionHtml": "<p>Spark, SQL</p>",
+             "publishedAt": "2026-10-01T10:00:00.000+00:00", "jobUrl": "https://jobs.ashbyhq.com/x/a1",
+             "secondaryLocations": [{"location": "Kolkata Office",
+                                     "address": {"postalAddress": {"addressLocality": "Kolkata",
+                                                                   "addressCountry": "India"}}}],
+             "compensation": {"summaryComponents": [{"compensationType": "Salary", "interval": "1 YEAR",
+                                                     "currencyCode": "INR", "minValue": 900000,
+                                                     "maxValue": 1400000}]}},
+            {"id": "a2", "title": "Hidden", "location": "Kolkata", "isListed": False}]})
+        r = ashby.collect(session, "x", "X Ltd", "cid")
+        self.assertTrue(r.complete)
+        self.assertEqual(len(r.jobs), 1)                       # unlisted job skipped
+        job = r.jobs[0]
+        self.assertIn("Kolkata, India", job.locations)
+        self.assertEqual((job.salary_min, job.salary_max, job.salary_period), (900000, 1400000, "year"))
+        self.assertEqual((job.job_type_hint, job.work_mode_hint), ("FullTime", "hybrid"))
+        self.assertEqual(job.apply_url, "https://jobs.ashbyhq.com/x/a1")
+
+    def test_bad_format(self):
+        session = mock.Mock()
+        session.get.return_value = fake_response([])
+        self.assertFalse(ashby.collect(session, "x", "X", "cid").complete)
+
+
+class TestWorkable(unittest.TestCase):
+    def test_parses_jobs(self):
+        session = mock.Mock()
+        session.get.return_value = fake_response({"name": "X", "jobs": [
+            {"title": "QA Engineer", "shortcode": "AB12", "url": "https://apply.workable.com/x/j/AB12/",
+             "description": "<p>Selenium</p>", "created_at": "2026-09-28", "employment_type": "Full-time",
+             "location": {"location_str": "Salt Lake, Kolkata, India", "city": "Kolkata", "country": "India",
+                          "workplace_type": "on_site"},
+             "locations": [{"city": "Howrah", "region": "West Bengal", "country_name": "India"}],
+             "salary": {"salary_from": 400000, "salary_to": 600000, "salary_currency": "INR"}},
+            {"title": "Support", "shortcode": "CD34", "shortlink": "https://apply.workable.com/j/CD34",
+             "city": "Pune", "country": "India", "telecommuting": True}]})
+        r = workable.collect(session, "x", "X Ltd", "cid")
+        self.assertTrue(r.complete)
+        first, second = r.jobs
+        self.assertEqual(first.source_job_id, "AB12")
+        self.assertIn("Salt Lake, Kolkata, India", first.locations)
+        self.assertIn("Howrah, West Bengal, India", first.locations)
+        self.assertEqual((first.work_mode_hint, first.salary_min, first.posted_at.day), ("onsite", 400000, 28))
+        self.assertEqual((second.apply_url, second.locations, second.work_mode_hint),
+                         ("https://apply.workable.com/j/CD34", ["Pune, India"], "remote"))
+
+    def test_error(self):
+        session = mock.Mock()
+        session.get.return_value = fake_response({}, status=404)
+        r = workable.collect(session, "nope", "X", "cid")
+        self.assertFalse(r.complete)
+        self.assertIn("404", r.error)
 
 
 class TestAdzuna(unittest.TestCase):

@@ -29,11 +29,14 @@ class TestInsights(unittest.TestCase):
         jobs.append(("sq1", "Data Analyst", "XYZ Ltd", "Kolkata", ["sql", "excel"], None, None, None, "open"))
         jobs.append(("sq2", "MIS Executive", "Bank Co", "Howrah", ["sql"], None, None, 1, "open"))
         jobs.append(("old", "Old Python Job", "Old Co", "Kolkata", ["python"], 9000000, 9000000, 0, "closed"))
-        for key, title, company, area, skills, smin, smax, exp, status in jobs:
+        jobs = [(*job, "jooble") for job in jobs]
+        # an open Adzuna job: shown in search, but never counted in insights (Adzuna's terms)
+        jobs.append(("adz", "Python Lead", "Adz Co", "Salt Lake", ["python"], 9000000, 9000000, 0, "open", "adzuna"))
+        for key, title, company, area, skills, smin, smax, exp, status, source in jobs:
             db.execute("""insert into public.jobs (job_key, source, company_name, title, area, apply_url, skills,
                               salary_min, salary_max, experience_min, status, posted_at, job_type)
-                          values (%s, 'adzuna', %s, %s, %s, 'https://x.in', %s, %s, %s, %s, %s, now(), 'full_time')""",
-                       (key, company, title, area, skills, smin, smax, exp, status))
+                          values (%s, %s, %s, %s, %s, 'https://x.in', %s, %s, %s, %s, %s, now(), 'full_time')""",
+                       (key, source, company, title, area, skills, smin, smax, exp, status))
         db.close()
         from app.main import app
         cls.cm = TestClient(app)
@@ -46,7 +49,7 @@ class TestInsights(unittest.TestCase):
 
     def test_market(self):
         m = self.client.get("/api/insights").json()
-        self.assertEqual(m["open_jobs"], 8)                                   # closed job not counted
+        self.assertEqual(m["open_jobs"], 8)                       # closed job and Adzuna job not counted
         self.assertEqual((m["fresher_friendly_jobs"], m["fresher_friendly_share"]), (3, 37.5))
         skills = {s["skill"]: s for s in m["top_skills"]}
         self.assertEqual([s["skill"] for s in m["top_skills"][:2]], ["sql", "python"])
@@ -64,6 +67,7 @@ class TestInsights(unittest.TestCase):
         self.assertEqual((s["skill"], s["jobs"], s["fresher_friendly_jobs"]), ("python", 6, 2))
         self.assertEqual(s["often_with"], [{"value": "sql", "count": 6}])
         self.assertEqual(s["top_companies"][0], {"value": "ABC Tech", "count": 4})
+        self.assertNotIn("Adz Co", [c["value"] for c in s["top_companies"]])
         self.assertEqual(self.client.get("/api/insights/skills/not-a-skill").status_code, 404)
 
 

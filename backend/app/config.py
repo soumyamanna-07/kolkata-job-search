@@ -21,6 +21,11 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
 # Websites allowed to call this API from a browser (the React app).
 CORS_ORIGINS = _list("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 
+# "Update jobs now" in the admin panel runs the whole collector on this server. The small free server
+# (512 MB) runs out of memory doing that, so switch it off there with SERVER_JOB_UPDATES=off and run
+# updates from your computer or the scheduled GitHub job instead.
+SERVER_JOB_UPDATES = os.getenv("SERVER_JOB_UPDATES", "on").strip().lower() not in ("off", "false", "0", "no")
+
 DB_POOL_MIN = int(os.getenv("DB_POOL_MIN", "1"))
 DB_POOL_MAX = int(os.getenv("DB_POOL_MAX", "5"))       # Supabase free plan allows few connections
 

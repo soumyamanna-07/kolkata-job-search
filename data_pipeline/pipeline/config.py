@@ -20,3 +20,7 @@ def require(name: str) -> str:
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "").strip()
 ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY", "").strip()
+JOOBLE_API_KEY = os.getenv("JOOBLE_API_KEY", "").strip()
+CAREERJET_API_KEY = os.getenv("CAREERJET_API_KEY", "").strip()
+# Careerjet asks for the IP of the person searching; for our daily batch run, our own server's IP.
+CAREERJET_USER_IP = os.getenv("CAREERJET_USER_IP", "").strip()

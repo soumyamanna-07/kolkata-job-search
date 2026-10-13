@@ -40,6 +40,7 @@ def search_jobs(
     job_type: CsvList = None,
     work_mode: CsvList = None,
     posted_within_days: Annotated[Optional[int], Query(ge=1, le=365)] = None,
+    direct_only: Annotated[bool, Query(description="only jobs that link straight to the employer")] = False,
     sort: Literal["relevance", "newest", "salary"] = "relevance",
     page: Annotated[int, Query(ge=1, le=1000)] = 1,
     page_size: Annotated[int, Query(ge=1, le=50)] = 20,
@@ -49,7 +50,7 @@ def search_jobs(
         q=q, areas=_split(area), companies=_split(company), skills=_split(skills, lower=True),
         salary_expected=salary_expected, include_undisclosed_salary=include_undisclosed_salary,
         experience_years=experience_years, job_types=_split(job_type), work_modes=_split(work_mode),
-        posted_within_days=posted_within_days, sort=sort, page=page, page_size=page_size,
+        posted_within_days=posted_within_days, direct_only=direct_only, sort=sort, page=page, page_size=page_size,
     )
     _check_allowed("area", filters.areas, AREAS)
     _check_allowed("job_type", filters.job_types, JOB_TYPES)

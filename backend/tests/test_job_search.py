@@ -46,6 +46,17 @@ class TestBuildSearchQuery(unittest.TestCase):
         self.assertIn("ts_rank", build_search_query(JobFiltersIn(q="python", sort="relevance"))[0])
         self.assertNotIn("ts_rank", build_search_query(JobFiltersIn(q="python", sort="newest"))[0])
 
+    def test_direct_apply_first_and_filter(self):
+        sql, _, params = build_search_query(JobFiltersIn())            # default sort = relevance
+        self.assertIn("(source = any(%(aggregators)s)), coalesce(posted_at", sql)
+        self.assertEqual(params["aggregators"], ["adzuna", "jooble", "careerjet", "jobicy"])
+        sql, _, _ = build_search_query(JobFiltersIn(q="python"))
+        self.assertIn("(source = any(%(aggregators)s)), (ts_rank", sql)
+        self.assertNotIn("source = any", build_search_query(JobFiltersIn(sort="newest"))[0])
+        sql, count_sql, _ = build_search_query(JobFiltersIn(direct_only=True, sort="newest"))
+        self.assertIn("source <> all(%(aggregators)s)", sql)
+        self.assertIn("source <> all(%(aggregators)s)", count_sql)
+
 
 if __name__ == "__main__":
     unittest.main()

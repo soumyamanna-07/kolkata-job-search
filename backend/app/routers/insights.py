@@ -3,6 +3,9 @@
 Public (guests too). Results are kept for 10 minutes, so busy pages don't hit the
 database on every visit. Salaries use only jobs that state one (yearly INR,
 middle of the min-max range).
+
+Adzuna jobs are shown in search but left out of these numbers: Adzuna's API terms don't allow
+aggregating their data (vacancy counts, salary averages) without their written consent.
 """
 import threading
 import time
@@ -24,7 +27,8 @@ _cache: dict[str, tuple[float, object]] = {}
 _cache_lock = threading.Lock()
 
 MIDPOINT = "((coalesce(salary_min, salary_max) + coalesce(salary_max, salary_min)) / 2.0)"
-OPEN = "status = 'open'"
+# open jobs we may count; Adzuna is excluded (see the note at the top)
+OPEN = "status = 'open' and source <> 'adzuna'"
 
 
 def _cached(key: str, build: Callable[[], object]) -> object:
