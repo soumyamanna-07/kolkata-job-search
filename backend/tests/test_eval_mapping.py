@@ -50,5 +50,23 @@ class TestMeasures(unittest.TestCase):
         self.assertIn("Python Programming,pandas,missed (false negative)", errors)
 
 
+class TestSweep(unittest.TestCase):
+    def test_sweep_restores_cut_off(self):
+        from app import embeddings, subject_skills as ss
+        from tests.test_syllabus_api import FlatEmbedder
+        embeddings.set_embedder(FlatEmbedder())
+        ss.clear_cache()
+        try:
+            before = ss.AI_MIN_SIMILARITY
+            text = em.sweep_ai([{"name": "Engineering Physics", "skills": []},
+                                {"name": "Database Management Systems", "skills": ["sql"]}], cuts=(0.4, before))
+            self.assertIn(f"| {before:.2f} (now) |", text)
+            self.assertIn("| 0.40 |", text)
+            self.assertEqual(ss.AI_MIN_SIMILARITY, before)
+        finally:
+            embeddings.set_embedder(None)
+            ss.clear_cache()
+
+
 if __name__ == "__main__":
     unittest.main()

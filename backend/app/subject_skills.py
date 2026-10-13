@@ -112,7 +112,7 @@ CURRICULUM: list[tuple[str, list[tuple[str, float]]]] = [
      [("computer vision", 0.9), ("python", 0.4)]),
     (r"generative ai|large language",
      [("generative ai", 0.9), ("llm", 0.9)]),
-    (r"data (science|analytics)|business analytics",
+    (r"(?<!big )data (science|analytics)|business analytics",          # not "Big Data Analytics" (that is Hadoop / Spark)
      [("data analysis", 0.9), ("python", 0.6), ("pandas", 0.6), ("statistics", 0.6), ("data visualization", 0.4)]),
     (r"data visuali[sz]ation",
      [("data visualization", 0.9), ("tableau", 0.4), ("power bi", 0.4)]),

@@ -75,6 +75,12 @@ class TestTable(unittest.TestCase):
         self.assertNotIn("c", links(out[6]))                     # C++ is not C
         self.assertIn("c++", links(out[6]))
 
+    def test_big_data_is_not_data_science(self):
+        big, science = ss.map_subjects([{"name": "Big Data Analytics"}, {"name": "Data Analytics"}], use_ai=False)
+        self.assertTrue({"hadoop", "spark"} <= set(links(big)))
+        self.assertFalse({"pandas", "python", "statistics"} & set(links(big)))   # bug found in Stage 1.10
+        self.assertIn("pandas", links(science))
+
     def test_elective_choices_are_kept_apart(self):
         out = ss.map_subjects([{"name": "Cloud Computing / Computer Vision / Graph Theory",
                                 "options": ["Cloud Computing", "Computer Vision", "Graph Theory"],

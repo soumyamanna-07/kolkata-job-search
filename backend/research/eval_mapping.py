@@ -20,6 +20,8 @@ Writes research/results/mapping_eval.md (tables for the project report) and mapp
 Run from the backend/ folder (needs the AI model, like the website):
     python -m research.eval_mapping
     python -m research.eval_mapping --no-ai      # layers 1 and 2 only (fast, no model)
+    python -m research.eval_mapping --sweep-ai   # also try other AI similarity cut-offs (choose it on THIS set,
+                                                 # then check the choice once on a separate, unseen set)
 """
 import argparse
 import csv
@@ -37,6 +39,7 @@ GOLD_FILE = HERE / "gold_subjects.json"
 RESULTS = HERE / "results"
 BOOTSTRAP = 2000
 SEED = 7
+SWEEP = (0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60)   # AI similarity cut-offs tried by --sweep-ai
 WEIGHT_CUTS = (0.6, 0.9)        # also score the system keeping only the stronger links (precision vs recall)
 
 
@@ -153,10 +156,33 @@ def report(rows: list[dict], subjects: list[dict], labelled_by: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def sweep_ai(subjects: list[dict], cuts=SWEEP) -> str:
+    """System F1 for each AI similarity cut-off (the AI layer only runs where the rules found nothing)."""
+    gold = [set(s["skills"]) for s in subjects]
+    saved = ss.AI_MIN_SIMILARITY
+    lines = ["", "## AI similarity cut-off (system)", "",
+             "| Cut-off | Precision | Recall | F1 | Empty subjects left empty | Skills added by AI |",
+             "|---|---|---|---|---|---|"]
+    try:
+        for cut in cuts:
+            ss.AI_MIN_SIMILARITY = cut
+            mapped = ss.map_subjects(subjects, use_ai=True)
+            predicted = [{l.skill for l in m.links} for m in mapped]
+            sc = score(list(zip(predicted, gold)))
+            added = sum(1 for m in mapped for l in m.links if l.source == "ai")
+            mark = " (now)" if cut == saved else ""
+            lines.append(f"| {cut:.2f}{mark} | {sc.precision:.2f} | {sc.recall:.2f} | {sc.f1:.2f} | "
+                         f"{sc.empty_ok}/{sc.empty_total} | {added} |")
+    finally:
+        ss.AI_MIN_SIMILARITY = saved
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: Optional[list[str]] = None, out_dir: Path = RESULTS, log: Callable[[str], None] = print) -> int:
     parser = argparse.ArgumentParser(description="Evaluate the subject -> skill mapping on the labelled test set.")
     parser.add_argument("--no-ai", action="store_true", help="skip the AI layer (no model needed)")
     parser.add_argument("--gold", type=Path, default=GOLD_FILE)
+    parser.add_argument("--sweep-ai", action="store_true", help="also try other AI similarity cut-offs")
     args = parser.parse_args(argv)
 
     data = json.loads(args.gold.read_text(encoding="utf-8"))
@@ -164,6 +190,8 @@ def main(argv: Optional[list[str]] = None, out_dir: Path = RESULTS, log: Callabl
     predictions = methods(subjects, use_ai=not args.no_ai)
     rows = evaluate(subjects, predictions)
     text = report(rows, subjects, data.get("labelled_by", "unknown"))
+    if args.sweep_ai and not args.no_ai:
+        text += sweep_ai(subjects)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "mapping_eval.md").write_text(text, encoding="utf-8")
