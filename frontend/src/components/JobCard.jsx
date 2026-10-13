@@ -6,6 +6,7 @@ import {
 } from '../lib/format'
 import Icon from '../lib/icons'
 import { SaveButton, ShareButton } from './JobActions'
+import SourceCredit from './SourceCredit'
 
 export function DirectBadge() {
   return (
@@ -83,10 +84,7 @@ export default function JobCard({ job, extra, badge, number }) {
             <span className="text-xs text-dusk">{job.skills.slice(0, 6).join(', ')}</span>
           )}
           <span className="ml-auto flex items-center -mr-2">
-            {credit && (
-              <a href={credit.url} target="_blank" rel="noopener noreferrer"
-                 className="mr-1 text-xs text-gray-500 hover:underline">{credit.text}</a>
-            )}
+            <SourceCredit credit={credit} className="mr-1 text-xs text-gray-500" />
             <ShareButton job={job} />
             <SaveButton jobId={job.id} />
           </span>

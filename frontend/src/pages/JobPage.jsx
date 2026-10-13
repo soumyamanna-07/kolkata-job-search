@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ReportButton, SaveButton, ShareButton } from '../components/JobActions'
 import { DirectBadge, facts } from '../components/JobCard'
+import SourceCredit from '../components/SourceCredit'
 import { api, trackEvent } from '../lib/api'
 import { isDirect, postedText, SOURCE_CREDITS } from '../lib/format'
 import Icon from '../lib/icons'
@@ -114,7 +115,7 @@ export default function JobPage() {
               <p className="mt-3 text-xs text-gray-500">
                 {direct
                   ? 'Opens the employer\'s own job page.'
-                  : <>Opens the job on {credit.name}, which links to the employer. <a href={credit.url} target="_blank" rel="noopener noreferrer" className="underline">{credit.text}</a></>}
+                  : <>Opens the job on {credit.name}, which links to the employer. <SourceCredit credit={credit} className="align-middle underline" /></>}
               </p>
             </div>
           )}

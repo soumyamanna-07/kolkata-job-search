@@ -43,7 +43,8 @@ export const WORK_MODE_LABELS = { onsite: 'On-site', hybrid: 'Hybrid', remote: '
 
 // job sites whose apply link goes through their own page; their terms ask us to credit them on every job
 export const SOURCE_CREDITS = {
-  adzuna: { name: 'Adzuna', text: 'Jobs by Adzuna', url: 'https://www.adzuna.in' },
+  // Adzuna's terms ask for their logo (at least 116 x 23 px), linked to their site
+  adzuna: { name: 'Adzuna', text: 'Jobs by Adzuna', url: 'https://www.adzuna.in', logo: '/adzuna-logo.png' },
   jooble: { name: 'Jooble', text: 'Jobs by Jooble', url: 'https://in.jooble.org' },
   careerjet: { name: 'Careerjet', text: 'Jobs by Careerjet', url: 'https://www.careerjet.co.in' },
   jobicy: { name: 'Jobicy', text: 'Jobs by Jobicy', url: 'https://jobicy.com' },
