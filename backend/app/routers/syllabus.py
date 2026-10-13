@@ -1,13 +1,14 @@
 """College Curriculum Gap Report API (Stage 1.6) - for students and faculty.
 
 Three ways in:
-  1. Approved syllabus first: pick college + department (+ semester) -> GET /api/syllabus/lookup.
-     If an admin-approved syllabus exists, POST /api/syllabus/report with its id.
+  1. Saved syllabus first: type or pick the college, department and semester -> GET /api/syllabus/lookup.
+     If a syllabus is in use for them, POST /api/syllabus/report with its id.
      If not, the answer says "please upload your syllabus".
   2. Quick check (guests too, NOTHING is stored): POST /api/syllabus/read with the PDF/Word file,
      correct the subject table if needed, then POST /api/syllabus/report with the subjects.
-  3. Share it (login): POST /api/me/syllabi stores it as "pending"; it is used for everyone only
-     after an admin approves it (admin pages: Stage 1.7).
+  3. Save it for everyone (login): POST /api/me/syllabi stores it as "unverified" and it is used for
+     everyone at once, shown as "not yet checked". An admin later approves or removes it.
+     When an approved and an unverified syllabus both match, the approved one is used.
 
 The report = curriculum gap engine (app.curriculum_gap) + extra classes (app.extra_classes),
 compared with live Kolkata jobs (Adzuna jobs never counted).
@@ -36,8 +37,11 @@ reports_per_minute = PerKeyLimiter(20, window=60)
 submissions_per_day = PerKeyLimiter(5, window=86400)
 
 MAX_SUBJECTS = 150
+IN_USE = ("approved", "unverified")          # syllabi used for everyone (unverified = not yet checked)
 FOUND = "Showing the approved syllabus. Upload your own syllabus for a more accurate result."
-NOT_FOUND = "We don't have an approved syllabus for this yet. Please upload your syllabus."
+FOUND_UNVERIFIED = ("Showing a syllabus another student sent (not yet checked by an admin). "
+                    "Upload your own syllabus for a more accurate result.")
+NOT_FOUND = "We don't have this syllabus yet. Please upload your syllabus."
 
 
 # ---------------------------------------------------------------- models
@@ -101,7 +105,7 @@ def _map(subjects: list[dict]) -> list[subject_skills.SubjectSkills]:
 
 
 # ---------------------------------------------------------------- colleges and approved syllabi
-SYLLABUS_META = """s.id, s.department, s.program, s.batch, s.semester, s.source, s.reviewed_at as approved_at,
+SYLLABUS_META = """s.id, s.department, s.program, s.batch, s.semester, s.source, s.status, s.reviewed_at as approved_at,
                    c.id as college_id, c.name as college_name, c.short_name as college_short_name,
                    c.university, (select count(*) from public.syllabus_subjects x where x.syllabus_id = s.id)
                    as subjects"""
@@ -109,34 +113,54 @@ SYLLABUS_META = """s.id, s.department, s.program, s.batch, s.semester, s.source,
 
 @router.get("/syllabus/colleges")
 def colleges(conn: psycopg.Connection = Depends(get_conn)):
-    """Approved colleges, each with the departments / semesters that have an approved syllabus."""
+    """Colleges people can pick (any college can also be typed), each with the departments /
+    semesters that have a syllabus in use. Rejected college names are left out."""
     with conn.cursor(row_factory=dict_row) as cur:
         rows = cur.execute("""select id, name, short_name, university, city from public.colleges
-                              where status = 'approved' order by name""").fetchall()
-        syl = cur.execute("""select college_id, department, batch, semester from public.syllabi
-                             where status = 'approved' order by department, semester nulls first""").fetchall()
+                              where status <> 'rejected' order by name""").fetchall()
+        syl = cur.execute("""select college_id, department, batch, semester, status from public.syllabi
+                             where status = any(%s) order by department, semester nulls first""",
+                          (list(IN_USE),)).fetchall()
     by_college: dict = {}
     for s in syl:
         by_college.setdefault(s["college_id"], []).append(
-            {"department": s["department"], "batch": s["batch"], "semester": s["semester"]})
+            {"department": s["department"], "batch": s["batch"], "semester": s["semester"],
+             "checked": s["status"] == "approved"})
     return [{**r, "syllabi": by_college.get(r["id"], [])} for r in rows]
 
 
+def _college_by_name(conn: psycopg.Connection, name: str) -> Optional[UUID]:
+    name = " ".join(name.split())
+    row = conn.execute("""select id from public.colleges where status <> 'rejected'
+                          and (lower(name) = lower(%s) or lower(short_name) = lower(%s))
+                          order by status = 'approved' desc limit 1""", (name, name)).fetchone()
+    return row[0] if row else None
+
+
 @router.get("/syllabus/lookup")
-def lookup(college_id: UUID, department: str = Query(..., min_length=2, max_length=120),
+def lookup(college_id: Optional[UUID] = None, college_name: Optional[str] = Query(None, max_length=200),
+           department: str = Query(..., min_length=2, max_length=120),
            semester: Optional[int] = Query(None, ge=1, le=10), conn: psycopg.Connection = Depends(get_conn)):
-    """The newest approved syllabus for this college + department (the semester's own one first,
-    else the whole-course one). Not found -> ask the user to upload theirs."""
+    """The syllabus in use for this college + department: approved before not-yet-checked, the semester's
+    own one before the whole-course one, newest first. Not found -> ask the user to upload theirs.
+    The college can be given by id or by the name the user typed."""
+    if college_id is None:
+        college_id = _college_by_name(conn, college_name or "") if (college_name or "").strip() else None
+        if college_id is None:
+            return {"found": False, "syllabus": None, "college_id": None, "message": NOT_FOUND}
     with conn.cursor(row_factory=dict_row) as cur:
         row = cur.execute(
             f"""select {SYLLABUS_META} from public.syllabi s join public.colleges c on c.id = s.college_id
-                where s.status = 'approved' and s.college_id = %s and lower(s.department) = lower(%s)
+                where s.status = any(%s) and s.college_id = %s and lower(s.department) = lower(%s)
                   and (%s::int is null or s.semester is null or s.semester = %s::int)
-                order by (s.semester is not null and s.semester = %s::int) desc, s.reviewed_at desc nulls last
-                limit 1""", (college_id, department.strip(), semester, semester, semester)).fetchone()
+                order by s.status = 'approved' desc, (s.semester is not null and s.semester = %s::int) desc,
+                         coalesce(s.reviewed_at, s.created_at) desc
+                limit 1""", (list(IN_USE), college_id, " ".join(department.split()), semester, semester,
+                             semester)).fetchone()
     if row is None:
-        return {"found": False, "syllabus": None, "message": NOT_FOUND}
-    return {"found": True, "syllabus": row, "message": FOUND}
+        return {"found": False, "syllabus": None, "college_id": college_id, "message": NOT_FOUND}
+    return {"found": True, "syllabus": row, "college_id": college_id,
+            "message": FOUND if row["status"] == "approved" else FOUND_UNVERIFIED}
 
 
 # ---------------------------------------------------------------- quick check (nothing stored)
@@ -166,7 +190,7 @@ def _approved(conn: psycopg.Connection, syllabus_id: UUID) -> tuple[dict, list[d
     with conn.cursor(row_factory=dict_row) as cur:
         meta = cur.execute(f"""select {SYLLABUS_META} from public.syllabi s
                                join public.colleges c on c.id = s.college_id
-                               where s.id = %s and s.status = 'approved'""", (syllabus_id,)).fetchone()
+                               where s.id = %s and s.status = any(%s)""", (syllabus_id, list(IN_USE))).fetchone()
         if meta is None:
             raise HTTPException(404, "This syllabus is not available")
         subjects = cur.execute("""select name, semester, code, kind, is_elective, options, credits::float as credits,
@@ -184,7 +208,7 @@ def report(body: ReportIn, request: Request, user: Optional[CurrentUser] = Depen
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many reports at once. Please wait a minute.")
     if body.syllabus_id is not None:
         meta, subjects = _approved(conn, body.syllabus_id)
-        department, source = meta["department"], "approved"
+        department, source = meta["department"], "saved"
     else:
         meta, subjects = None, [_subject_dict(s) for s in body.subjects]
         department, source = body.department, "quick"
@@ -208,11 +232,12 @@ def _college_id(conn: psycopg.Connection, user: CurrentUser, college_id: Optiona
     name = " ".join((college_name or "").split())
     if not 3 <= len(name) <= 200:
         raise HTTPException(422, "Choose your college, or type its full name")
-    row = conn.execute("select id, status from public.colleges where lower(name) = lower(%s)", (name,)).fetchone()
-    if row is not None:
-        if row[1] == "rejected":
-            raise HTTPException(422, "This college name was not accepted. Please choose it from the list.")
-        return row[0]
+    found = _college_by_name(conn, name)
+    if found is not None:
+        return found
+    row = conn.execute("select id from public.colleges where lower(name) = lower(%s)", (name,)).fetchone()
+    if row is not None:                                      # the name exists but was rejected by an admin
+        raise HTTPException(422, "This college name was not accepted. Please choose it from the list.")
     return conn.execute("""insert into public.colleges (name, city, status, created_by)
                            values (%s, 'Kolkata', 'pending', %s) returning id""", (name, user.id)).fetchone()[0]
 
@@ -228,7 +253,8 @@ def submit(file: UploadFile = File(..., description="The syllabus PDF or Word fi
                                                description="The corrected subject table (JSON list); "
                                                            "if left out, the subjects read from the file"),
            user: CurrentUser = Depends(get_current_user), conn: psycopg.Connection = Depends(get_conn)):
-    """Send your syllabus to be saved for everyone. It stays "pending" until an admin approves it."""
+    """Save your syllabus for everyone. It is used at once, shown as "not yet checked" until an admin
+    approves it (an admin can also remove it)."""
     if not submissions_per_day.allow(user.id):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "You can send up to 5 syllabi a day.")
     text, parsed = _read_file(file)
@@ -251,7 +277,7 @@ def submit(file: UploadFile = File(..., description="The syllabus PDF or Word fi
         sid = conn.execute(
             """insert into public.syllabi (college_id, department, batch, semester, source, status, file_name,
                                            raw_text, submitted_by)
-               values (%s, %s, %s, %s, 'upload', 'pending', %s, %s, %s) returning id""",
+               values (%s, %s, %s, %s, 'upload', 'unverified', %s, %s, %s) returning id""",
             (cid, " ".join(department.split()), (batch or "").strip() or parsed.batch, semester,
              (file.filename or "syllabus")[:200], text[:400000], user.id)).fetchone()[0]
         with conn.cursor() as cur:
@@ -263,13 +289,13 @@ def submit(file: UploadFile = File(..., description="The syllabus PDF or Word fi
                   s["topics"] or None, sorted({l.skill for l in m.links}),
                   embeddings.to_pgvector(m.vector) if m.vector is not None else None, i)
                  for i, (s, m) in enumerate(zip(subjects, mapped))])
-    return {"id": str(sid), "status": "pending", "subjects": len(subjects),
-            "message": "Thank you! Your syllabus will be used for everyone after an admin checks it."}
+    return {"id": str(sid), "status": "unverified", "subjects": len(subjects),
+            "message": "Saved. Classmates who choose the same college and department now get this syllabus."}
 
 
 @router.get("/me/syllabi")
 def my_syllabi(user: CurrentUser = Depends(get_current_user), conn: psycopg.Connection = Depends(get_conn)):
-    """The syllabi you sent and their status (pending / approved / rejected)."""
+    """The syllabi you sent and their status (unverified = in use, not yet checked / approved / rejected)."""
     with conn.cursor(row_factory=dict_row) as cur:
         return cur.execute(
             """select s.id, c.name as college_name, s.department, s.batch, s.semester, s.status, s.review_note,
@@ -282,9 +308,9 @@ def my_syllabi(user: CurrentUser = Depends(get_current_user), conn: psycopg.Conn
 @router.delete("/me/syllabi/{syllabus_id}", status_code=status.HTTP_204_NO_CONTENT)
 def withdraw(syllabus_id: UUID, user: CurrentUser = Depends(get_current_user),
              conn: psycopg.Connection = Depends(get_conn)):
-    """Take back a syllabus you sent, while it is still pending."""
-    row = conn.execute("""delete from public.syllabi where id = %s and submitted_by = %s and status = 'pending'
-                          returning id""", (syllabus_id, user.id)).fetchone()
+    """Take back a syllabus you sent, until an admin has approved it."""
+    row = conn.execute("""delete from public.syllabi where id = %s and submitted_by = %s
+                          and status in ('pending', 'unverified') returning id""", (syllabus_id, user.id)).fetchone()
     if row is None:
-        raise HTTPException(404, "No pending syllabus of yours with this id")
+        raise HTTPException(404, "No syllabus of yours that can still be taken back has this id")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

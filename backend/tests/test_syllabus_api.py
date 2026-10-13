@@ -1,4 +1,4 @@
-"""Curriculum gap API: quick check (nothing stored), approved-first lookup, sending a syllabus for approval.
+"""Curriculum gap API: quick check (nothing stored), lookup of saved syllabi (approved first), saving a syllabus.
 Uses the MADE-UP syllabus from test_syllabus_parser (no real college syllabus in the tests)."""
 import io
 import json
@@ -140,7 +140,7 @@ class TestSyllabusApi(unittest.TestCase):
         c, h = self.client, self.h
         lookup = {"college_id": self.college, "department": "Computer Science (Data Science)", "semester": 4}
         r = c.get("/api/syllabus/lookup", params=lookup).json()
-        self.assertEqual((r["found"], r["message"]), (False, "We don't have an approved syllabus for this yet. "
+        self.assertEqual((r["found"], r["message"]), (False, "We don't have this syllabus yet. "
                                                            "Please upload your syllabus."))
 
         self.assertEqual(self.upload("/api/me/syllabi", data={"department": "CSE"}).status_code, 401)  # login
@@ -150,28 +150,43 @@ class TestSyllabusApi(unittest.TestCase):
                               "batch": "2024-28"})
         self.assertEqual(r.status_code, 201, r.text)
         sid = r.json()["id"]
-        self.assertEqual(r.json()["status"], "pending")
+        self.assertEqual(r.json()["status"], "unverified")
         row = self.db.execute("select status, submitted_by::text, length(raw_text) > 100 from public.syllabi "
                               "where id = %s", (sid,)).fetchone()
-        self.assertEqual(row, ("pending", self.ids["asha"], True))
+        self.assertEqual(row, ("unverified", self.ids["asha"], True))
         skills = self.db.execute("select skills from public.syllabus_subjects where syllabus_id = %s "
                                  "and name = 'Database Management Systems'", (sid,)).fetchone()[0]
         self.assertIn("sql", skills)
 
-        # pending: not used for anyone yet
-        self.assertFalse(c.get("/api/syllabus/lookup", params=lookup).json()["found"])
-        self.assertEqual(c.post("/api/syllabus/report", json={"syllabus_id": sid}).status_code, 404)
+        # used for everyone at once, shown as not yet checked; found by the typed college name too
+        r = c.get("/api/syllabus/lookup", params=lookup).json()
+        self.assertEqual((r["found"], r["syllabus"]["id"], r["syllabus"]["status"]), (True, sid, "unverified"))
+        self.assertIn("not yet checked", r["message"])
+        by_name = {k: v for k, v in lookup.items() if k != "college_id"}
+        typed = {**by_name, "college_name": "  techno main   salt lake "}
+        self.assertEqual(c.get("/api/syllabus/lookup", params=typed).json()["syllabus"]["id"], sid)
+        by_short = {**by_name, "college_name": "TMSL"}
+        self.assertEqual(c.get("/api/syllabus/lookup", params=by_short).json()["syllabus"]["id"], sid)
+        unknown = {**by_name, "college_name": "Some Other College"}
+        self.assertEqual(c.get("/api/syllabus/lookup", params=unknown).json()["found"], False)
+        self.assertEqual(c.post("/api/syllabus/report", json={"syllabus_id": sid}).status_code, 200)
 
         mine = c.get("/api/me/syllabi", headers=h["asha"]).json()
-        self.assertEqual([(m["id"], m["status"], m["subjects"]) for m in mine], [(sid, "pending", 8)])
+        self.assertEqual([(m["id"], m["status"], m["subjects"]) for m in mine], [(sid, "unverified", 8)])
         self.assertEqual(c.get("/api/me/syllabi", headers=h["ravi"]).json(), [])
 
-        # an admin approves it (the admin page comes in Stage 1.7)
+        # an admin approves it
         self.db.execute("update public.syllabi set status = 'approved', reviewed_at = now() where id = %s", (sid,))
         r = c.get("/api/syllabus/lookup", params=lookup).json()
         self.assertTrue(r["found"])
         self.assertEqual((r["syllabus"]["id"], r["syllabus"]["subjects"]), (sid, 8))
-        self.assertIn("more accurate", r["message"])
+        self.assertEqual(r["message"], "Showing the approved syllabus. Upload your own syllabus for a more accurate result.")
+
+        # a newer unverified one does not push the approved one aside
+        newer = self.upload("/api/me/syllabi", headers=h["ravi"],
+                            data={"college_id": self.college, "department": "computer science (data science)"}).json()["id"]
+        self.assertEqual(c.get("/api/syllabus/lookup", params=lookup).json()["syllabus"]["id"], sid)
+        self.assertEqual(c.delete(f"/api/me/syllabi/{newer}", headers=h["ravi"]).status_code, 204)
         other_dept = c.get("/api/syllabus/lookup", params={**lookup, "department": "Mechanical"}).json()
         self.assertFalse(other_dept["found"])
 
@@ -179,13 +194,13 @@ class TestSyllabusApi(unittest.TestCase):
                                                  "chosen": ["Cloud Computing"]})
         self.assertEqual(r.status_code, 200, r.text)
         out = r.json()
-        self.assertEqual((out["source"], out["syllabus"]["college_name"]), ("approved", "Techno Main Salt Lake"))
+        self.assertEqual((out["source"], out["syllabus"]["college_name"]), ("saved", "Techno Main Salt Lake"))
         docker = [s for s in out["report"]["skills"] if s["skill"] == "docker"][0]
         self.assertEqual(docker["status"], "partial")                          # chosen elective counts
 
         listed = [x for x in c.get("/api/syllabus/colleges").json() if x["id"] == self.college][0]
         self.assertEqual(listed["syllabi"], [{"department": "Computer Science (Data Science)",
-                                              "batch": "2024-28", "semester": None}])
+                                              "batch": "2024-28", "semester": None, "checked": True}])
         self.assertEqual(c.delete(f"/api/me/syllabi/{sid}", headers=h["asha"]).status_code, 404)  # approved: stays
 
     def test_4_new_college_edited_table_and_withdraw(self):
@@ -200,8 +215,13 @@ class TestSyllabusApi(unittest.TestCase):
         college = self.db.execute("select name, status from public.colleges where lower(name) = "
                                   "'example institute of technology'").fetchone()
         self.assertEqual(college, ("Example Institute of Technology", "pending"))
-        colleges = [x["name"] for x in c.get("/api/syllabus/colleges").json()]
-        self.assertNotIn("Example Institute of Technology", colleges)          # pending colleges are not listed
+        colleges = {x["name"]: x for x in c.get("/api/syllabus/colleges").json()}
+        self.assertEqual(colleges["Example Institute of Technology"]["syllabi"][0]["checked"], False)   # typed: listed
+        self.db.execute("update public.colleges set status = 'rejected' where lower(name) = 'example institute of technology'")
+        self.assertNotIn("Example Institute of Technology", [x["name"] for x in c.get("/api/syllabus/colleges").json()])
+        again = self.upload("/api/me/syllabi", headers=h["ravi"], data={"college_name": "Example Institute of Technology",
+                                                                          "department": "IT"})
+        self.assertEqual(again.status_code, 422)                               # a rejected name stays rejected
 
         bad = self.upload("/api/me/syllabi", headers=h["ravi"],
                           data={"college_id": self.college, "department": "IT", "subjects_json": "[{\"x\": 1}]"})

@@ -1,8 +1,8 @@
 """Admin: check syllabi that users sent, and the colleges they named (Stage 1.7).
 
-A syllabus is used for everyone only after an admin approves it here. Before approving, the admin
-can compare the subject table with the text read from the file, fix subjects, and fix the
-department / batch / semester. Approving archives the older approved syllabus for the same
+Syllabi from logged-in users are used at once as "unverified" (not yet checked). Here the admin
+compares the subject table with the text read from the file, fixes subjects and the
+department / batch / semester, then approves it (checked) or removes it (rejected). Approving archives the older approved syllabus for the same
 college + department + batch + semester, and approves the college if it was new.
 Every decision is saved in the audit log.
 """
@@ -73,11 +73,11 @@ def _one(conn: psycopg.Connection, syllabus_id: UUID) -> dict:
 
 # ---------------------------------------------------------------- syllabi
 @router.get("/syllabi")
-def list_syllabi(status: Literal["pending", "approved", "rejected", "archived", "all"] = "pending",
+def list_syllabi(status: Literal["unverified", "pending", "approved", "rejected", "archived", "all"] = "unverified",
                  admin: CurrentUser = Depends(admin_only), conn: psycopg.Connection = Depends(get_conn)):
-    """Syllabi to check (oldest first for pending, newest first otherwise)."""
+    """Syllabi to check (oldest first for unverified / pending, newest first otherwise)."""
     where, order = ("", "s.created_at desc") if status == "all" else (" where s.status = %s", "s.created_at desc")
-    if status == "pending":
+    if status in ("unverified", "pending"):
         order = "s.created_at"
     with conn.cursor(row_factory=dict_row) as cur:
         return cur.execute(f"{LIST_SQL}{where} order by {order} limit 200",
@@ -104,7 +104,7 @@ def replace_subjects(syllabus_id: UUID, body: SubjectsIn, admin: CurrentUser = D
                      conn: psycopg.Connection = Depends(get_conn)):
     """Save the corrected subject table (the skills are found again)."""
     row = _one(conn, syllabus_id)
-    if row["status"] not in ("pending", "approved"):
+    if row["status"] not in ("pending", "unverified", "approved"):
         raise HTTPException(409, f"This syllabus is {row['status']}; it cannot be edited")
     subjects = [_subject_dict(s) for s in body.subjects]
     mapped = _map(subjects)
@@ -127,9 +127,9 @@ def replace_subjects(syllabus_id: UUID, body: SubjectsIn, admin: CurrentUser = D
 @router.post("/syllabi/{syllabus_id}/review")
 def review_syllabus(syllabus_id: UUID, body: SyllabusReview, admin: CurrentUser = Depends(admin_only),
                     conn: psycopg.Connection = Depends(get_conn)):
-    """Approve (it is then used for everyone) or reject (with a reason the sender sees)."""
+    """Approve (checked; used before unverified ones) or reject / remove (with a reason the sender sees)."""
     row = _one(conn, syllabus_id)
-    if row["status"] != "pending":
+    if row["status"] not in ("pending", "unverified"):
         raise HTTPException(409, f"This syllabus is already {row['status']}")
     note = (body.note or "").strip() or None
     with conn.transaction():
@@ -171,8 +171,8 @@ def list_colleges(status: Literal["pending", "approved", "rejected", "all"] = "a
                        c.created_at,
                        (select count(*) from public.syllabi s where s.college_id = c.id and s.status = 'approved')
                        as approved_syllabi,
-                       (select count(*) from public.syllabi s where s.college_id = c.id and s.status = 'pending')
-                       as pending_syllabi
+                       (select count(*) from public.syllabi s where s.college_id = c.id
+                          and s.status in ('pending', 'unverified')) as pending_syllabi
                 from public.colleges c {'' if status == 'all' else 'where c.status = %s'}
                 order by c.status = 'pending' desc, c.name""", () if status == "all" else (status,)).fetchall()
 

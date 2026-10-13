@@ -1,6 +1,6 @@
 // Admin: syllabi sent by students and faculty, and the colleges they named.
-// A syllabus is used for everyone only after it is approved here. Check the subject table
-// against the text read from the file, fix it if needed, then approve or reject.
+// Syllabi from logged-in users are used at once ("in use, not checked"). Check the subject table
+// against the text read from the file, fix it if needed, then approve it or remove it.
 import { useCallback, useEffect, useState } from 'react'
 import AdminTabs from '../components/AdminTabs'
 import SubjectTable, { cleanSubjects } from '../components/SubjectTable'
@@ -8,11 +8,14 @@ import { api } from '../lib/api'
 import { postedText } from '../lib/format'
 import { useToast } from '../lib/toast'
 
-const STATUSES = [['pending', 'Waiting'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['archived', 'Replaced'], ['all', 'All']]
+const STATUSES = [['unverified', 'In use, not checked'], ['pending', 'Waiting'], ['approved', 'Approved'],
+  ['rejected', 'Removed'], ['archived', 'Replaced'], ['all', 'All']]
+const STATUS_LABEL = Object.fromEntries(STATUSES)
 const STATUS_STYLE = {
-  pending: 'bg-amber-100 text-amber-900', approved: 'bg-green-100 text-green-800',
+  unverified: 'bg-amber-100 text-amber-900', pending: 'bg-amber-100 text-amber-900', approved: 'bg-green-100 text-green-800',
   rejected: 'bg-red-50 text-sindoor', archived: 'bg-gray-100 text-gray-600',
 }
+const TO_CHECK = ['pending', 'unverified']
 const input = 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm'
 
 function semesterText(s) {
@@ -38,7 +41,7 @@ function SyllabusCheck({ id, onDone, onClose }) {
     }).catch((e) => setError(e.message))
   }, [id])
 
-  const editable = data && ['pending', 'approved'].includes(data.status)
+  const editable = data && ['pending', 'unverified', 'approved'].includes(data.status)
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
 
   async function saveTable() {
@@ -59,7 +62,7 @@ function SyllabusCheck({ id, onDone, onClose }) {
         if (await saveTable()) toast('Subject table saved.')
       } else if (action === 'reject') {
         await api(`/api/admin/syllabi/${id}/review`, { method: 'POST', body: { decision: 'reject', note: form.note.trim() } })
-        toast('Syllabus rejected. The sender sees your reason.')
+        toast('Syllabus removed. The sender sees your reason.')
         onDone()
       } else {
         if (changed && !(await saveTable())) { setBusy(false); return }
@@ -69,7 +72,7 @@ function SyllabusCheck({ id, onDone, onClose }) {
             semester: form.whole || form.semester === '' ? null : Number(form.semester), whole_course: form.whole,
             note: form.note.trim() || null },
         })
-        toast('Approved. It is now used for everyone.')
+        toast('Approved. It is now shown as checked.')
         onDone()
       }
     } catch (e) {
@@ -108,7 +111,7 @@ function SyllabusCheck({ id, onDone, onClose }) {
         <p className="text-sm text-gray-600">This syllabus is {data.status}; its subjects can no longer be changed.</p>
       )}
 
-      {data.status === 'pending' && (
+      {TO_CHECK.includes(data.status) && (
         <div className="grid sm:grid-cols-4 gap-3 text-sm">
           <label className="block sm:col-span-2">Department
             <input value={form.department} onChange={update('department')} maxLength={120} className={input} />
@@ -124,7 +127,7 @@ function SyllabusCheck({ id, onDone, onClose }) {
               <input type="checkbox" checked={form.whole} onChange={update('whole')} /> Whole course (all semesters)
             </label>
           </div>
-          <label className="block sm:col-span-4">Note to the sender (needed when rejecting)
+          <label className="block sm:col-span-4">Note to the sender (needed when removing)
             <input value={form.note} onChange={update('note')} maxLength={1000}
                    placeholder="e.g. This is the 2018 syllabus; please send the current one." className={input} />
           </label>
@@ -133,7 +136,7 @@ function SyllabusCheck({ id, onDone, onClose }) {
 
       {error && <p className="p-2 rounded bg-red-50 text-sindoor text-sm">{error}</p>}
       <div className="flex flex-wrap gap-2 text-sm">
-        {data.status === 'pending' && (
+        {TO_CHECK.includes(data.status) && (
           <button disabled={busy} onClick={() => run('approve')} className="px-4 py-2 rounded bg-hooghly text-white font-semibold disabled:opacity-50">
             {changed ? 'Save table and approve' : 'Approve'}
           </button>
@@ -143,11 +146,11 @@ function SyllabusCheck({ id, onDone, onClose }) {
             Save table only
           </button>
         )}
-        {data.status === 'pending' && (
+        {TO_CHECK.includes(data.status) && (
           <button disabled={busy || form.note.trim().length < 3} onClick={() => run('reject')}
                   title={form.note.trim().length < 3 ? 'Write a note to the sender first' : undefined}
                   className="px-4 py-2 rounded border border-gray-300 bg-white hover:bg-red-50 disabled:opacity-50">
-            Reject
+            Remove
           </button>
         )}
       </div>
@@ -214,7 +217,7 @@ function College({ c, onSaved }) {
 }
 
 export default function AdminSyllabiPage() {
-  const [status, setStatus] = useState('pending')
+  const [status, setStatus] = useState('unverified')
   const [list, setList] = useState(null)
   const [colleges, setColleges] = useState(null)
   const [open, setOpen] = useState(null)
@@ -236,7 +239,8 @@ export default function AdminSyllabiPage() {
       <section>
         <h2 className="font-display text-2xl mb-1">Syllabi</h2>
         <p className="text-sm text-gray-600 mb-3">
-          Sent by students and faculty. Approved syllabi are shown first to everyone from that college and department.
+          Sent by logged-in students and faculty and used at once. Check them here: approved ones are shown first,
+          removed ones are no longer used.
         </p>
         <div className="flex flex-wrap gap-1 mb-3" role="tablist" aria-label="Syllabus status">
           {STATUSES.map(([v, t]) => (
@@ -262,10 +266,10 @@ export default function AdminSyllabiPage() {
                     {s.review_note && <p className="text-sm text-gray-700 mt-1">Note: {s.review_note}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-sm text-sm ${STATUS_STYLE[s.status]}`}>{s.status}</span>
+                    <span className={`px-2 py-0.5 rounded-sm text-sm ${STATUS_STYLE[s.status]}`}>{STATUS_LABEL[s.status]}</span>
                     <button onClick={() => setOpen(open === s.id ? null : s.id)} aria-expanded={open === s.id}
                             className="px-3 py-1.5 rounded border border-gray-300 text-sm hover:border-dusk">
-                      {open === s.id ? 'Close' : s.status === 'pending' ? 'Check' : 'Open'}
+                      {open === s.id ? 'Close' : TO_CHECK.includes(s.status) ? 'Check' : 'Open'}
                     </button>
                   </div>
                 </div>
@@ -278,7 +282,7 @@ export default function AdminSyllabiPage() {
 
       <section className="mt-10">
         <h2 className="font-display text-2xl mb-1">Colleges</h2>
-        <p className="text-sm text-gray-600 mb-3">New names typed by users wait here. Only approved colleges appear in the lists.</p>
+        <p className="text-sm text-gray-600 mb-3">Names typed by users appear here and in the college suggestions at once. Reject a wrong or duplicate name to hide it.</p>
         {colleges && (
           <ul className="bg-white border border-gray-200 rounded divide-y divide-gray-200">
             {colleges.map((c) => <College key={c.id} c={c} onSaved={load} />)}

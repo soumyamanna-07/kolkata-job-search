@@ -1,9 +1,10 @@
-// College syllabus check (Curriculum Gap Report) for students and faculty.
-// 1. Pick college + department + semester: an admin-approved syllabus is used first.
-// 2. Or upload your syllabus (PDF / Word): a quick check, nothing is stored.
-// 3. The report compares the syllabus with what live Kolkata jobs ask for, shows the gaps
-//    as charts, what to learn now, and which extra classes a college could arrange.
-// 4. Logged-in users can send their syllabus so it is used for everyone (after an admin checks it).
+// Kolkata Tech Job Market Intelligence & Skill Gap Analyser (curriculum gap report), one step at a time:
+// 1. Your details: type the college, department and semester.
+// 2. If we already have that syllabus, the report comes straight away (with an option to upload
+//    your own for a more accurate result). If not, upload it (PDF / Word).
+//    Logged-in users can save it for classmates: it is used at once, shown as "not yet checked"
+//    until an admin approves it. Guests get the report, but nothing is stored.
+// 3. The report: gaps as charts, what to learn now, and which extra classes a college could arrange.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import SubjectTable, { cleanSubjects } from '../components/SubjectTable'
@@ -163,9 +164,9 @@ function Summary({ data }) {
   return (
     <section className="bg-white border border-gray-200 rounded p-5 print-avoid">
       <p className="text-sm text-gray-600">
-        {data.source === 'approved'
-          ? `Approved syllabus: ${data.syllabus.college_name}, ${data.department}${data.syllabus.batch ? `, batch ${data.syllabus.batch}` : ''}`
-          : `Your uploaded syllabus${data.department ? `: ${data.department}` : ''} (not stored)`}
+        {data.source === 'saved'
+          ? `${data.syllabus.status === 'approved' ? 'Approved syllabus' : 'Syllabus sent by a student, not yet checked'}: ${data.syllabus.college_name}, ${data.department}${data.syllabus.batch ? `, batch ${data.syllabus.batch}` : ''}`
+          : `Your uploaded syllabus${data.department ? `: ${data.department}` : ''} ${data.savedNow ? '(saved for your classmates)' : '(not stored)'}`}
         {' \u00b7 '}compared with {r.market.jobs} open {r.field === 'computing' ? 'computing ' : ''}jobs in Kolkata
       </p>
       <div className="mt-3 flex flex-wrap items-end gap-x-10 gap-y-4">
@@ -339,147 +340,111 @@ function Report({ data, audience, onRerun, electiveChoices, chosen, setChosen })
   )
 }
 
-// ---------------------------------------------------------------- share the syllabus (login)
-function ShareSyllabus({ file, subjects, colleges, defaults }) {
-  const { user } = useAuth()
-  const toast = useToast()
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ college_id: defaults.college_id || '', college_name: '', department: defaults.department || '',
-    batch: defaults.batch || '', semester: '' })
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [sent, setSent] = useState(null)
-  const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
+// ---------------------------------------------------------------- the steps
+const STEPS = ['Your details', 'Your syllabus', 'Your report']
 
-  if (!user) {
-    return (
-      <p className="text-sm text-gray-700">
-        Want this syllabus used for everyone from your college? <Link to={loginUrl('/syllabus')} className="text-dusk underline">Log in</Link> and
-        send it; an admin checks it first.
-      </p>
-    )
-  }
-  if (sent) return <p className="text-sm p-3 rounded bg-green-50 text-green-800">{sent}</p>
+function StepBar({ step }) {
+  return (
+    <ol className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm" aria-label="Steps">
+      {STEPS.map((label, i) => {
+        const n = i + 1
+        const state = n < step ? 'done' : n === step ? 'now' : 'later'
+        return (
+          <li key={label} className="flex items-center gap-2" aria-current={state === 'now' ? 'step' : undefined}>
+            <span className={`w-7 h-7 rounded-full grid place-items-center font-semibold ${
+              state === 'now' ? 'bg-dusk text-white' : state === 'done' ? 'bg-hooghly text-white' : 'border border-gray-300 text-gray-500'}`}>
+              {state === 'done' ? '\u2713' : n}
+            </span>
+            <span className={state === 'later' ? 'text-gray-500' : 'font-medium'}>{label}</span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
 
-  async function send(e) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('department', form.department.trim())
-    if (form.college_id && form.college_id !== 'other') fd.append('college_id', form.college_id)
-    else fd.append('college_name', form.college_name.trim())
-    if (form.batch.trim()) fd.append('batch', form.batch.trim())
-    if (form.semester) fd.append('semester', form.semester)
-    fd.append('subjects_json', JSON.stringify(cleanSubjects(subjects)))
-    try {
-      const r = await api('/api/me/syllabi', { method: 'POST', form: fd })
-      setSent(r.message)
-      toast('Syllabus sent for checking.')
-    } catch (err) {
-      setError(err.message)
-    }
-    setBusy(false)
-  }
-
-  return open ? (
-    <form onSubmit={send} className="grid sm:grid-cols-2 gap-3 text-sm">
-      <p className="sm:col-span-2 text-gray-700">
-        We keep the file and the subject table so an admin can check them. After approval, everyone who picks your college and
-        department sees this syllabus first. You can take it back while it is waiting.
-      </p>
-      <label className="block">College
-        <select required value={form.college_id} onChange={update('college_id')} className={input}>
-          <option value="">Choose your college</option>
-          {colleges.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          <option value="other">My college is not in the list</option>
-        </select>
-      </label>
-      {form.college_id === 'other' && (
-        <label className="block">College full name
-          <input required minLength={3} maxLength={200} value={form.college_name} onChange={update('college_name')} className={input} />
-        </label>
-      )}
-      <label className="block">Department
-        <input required minLength={2} maxLength={120} value={form.department} onChange={update('department')} placeholder="e.g. CSE (AI & ML)" className={input} />
-      </label>
-      <label className="block">Batch
-        <input maxLength={40} value={form.batch} onChange={update('batch')} placeholder="e.g. 2023-27" className={input} />
-      </label>
-      <label className="block">Only one semester? (leave empty for the whole course)
-        <select value={form.semester} onChange={update('semester')} className={input}>
-          <option value="">Whole course</option>
-          {SEMESTERS.map((s) => <option key={s} value={s}>Semester {s}</option>)}
-        </select>
-      </label>
-      {error && <p className="sm:col-span-2 p-2 rounded bg-red-50 text-sindoor">{error}</p>}
-      <div className="sm:col-span-2 flex gap-2">
-        <button disabled={busy} className="px-4 py-2 rounded bg-dusk text-white font-semibold disabled:opacity-50">{busy ? 'Sending' : 'Send for checking'}</button>
-        <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 rounded border border-gray-300">Cancel</button>
-      </div>
-    </form>
-  ) : (
-    <button onClick={() => setOpen(true)} className="px-4 py-2 rounded border border-gray-300 text-sm hover:border-dusk">
-      Send this syllabus so it is used for everyone
-    </button>
+function DetailsLine({ details, onChange }) {
+  return (
+    <p className="text-sm text-gray-700">
+      <strong>{details.college}</strong> {'\u00b7'} {details.department}
+      {details.semester ? ` \u00b7 semester ${details.semester}` : ' \u00b7 whole course'}
+      <button type="button" onClick={onChange} className="ml-3 text-dusk underline no-print">Change</button>
+    </p>
   )
 }
 
 // ---------------------------------------------------------------- the page
 export default function CurriculumPage() {
+  const { user } = useAuth()
   const toast = useToast()
   const [colleges, setColleges] = useState([])
   const [audience, setAudience] = useState('student')
-  const [pick, setPick] = useState({ college_id: '', department: '', semester: '' })
+  const [step, setStep] = useState(1)                 // 1 details, 2 upload, 3 report
+  const [form, setForm] = useState({ college: '', department: '', semester: '' })
+  const [details, setDetails] = useState(null)        // what was searched: { college, college_id, department, semester }
   const [lookup, setLookup] = useState(null)          // { found, syllabus, message }
   const [file, setFile] = useState(null)
-  const [read, setRead] = useState(null)              // what the quick check read from the file
+  const [read, setRead] = useState(null)              // what was read from the file
   const [subjects, setSubjects] = useState([])
+  const [save, setSave] = useState(true)
   const [chosen, setChosen] = useState([])
   const [report, setReport] = useState(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
-  const uploadRef = useRef(null)
-  const reportRef = useRef(null)
+  const topRef = useRef(null)
 
   useEffect(() => { api('/api/syllabus/colleges').then(setColleges).catch(() => {}) }, [])
 
-  const college = colleges.find((c) => c.id === pick.college_id)
+  const norm = (v) => v.trim().replace(/\s+/g, ' ').toLowerCase()
+  const college = colleges.find((c) => norm(c.name) === norm(form.college) || (c.short_name && norm(c.short_name) === norm(form.college)))
   const departments = useMemo(() => [...new Set((college?.syllabi || []).map((s) => s.department))], [college])
-  const semester = pick.semester ? Number(pick.semester) : null
+  const semester = form.semester ? Number(form.semester) : null
 
-  // elective choices: from the uploaded table, or from the report of an approved syllabus
   const electiveChoices = useMemo(() => {
     if (report?.source === 'quick') return [...new Set(subjects.filter((s) => s.is_elective).flatMap((s) => s.options || []).filter(Boolean))]
     if (report) return [...new Set(report.report.skills.flatMap((s) => s.taught_in.filter((t) => t.option).map((t) => t.option)))]
     return []
   }, [report, subjects])
 
-  async function makeReport(body) {
+  const goTo = (n) => {
+    setStep(n)
+    setError('')
+    setTimeout(() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30)
+  }
+
+  async function makeReport(body, extra = {}) {
     setBusy('report')
     setError('')
     try {
-      const data = await api('/api/syllabus/report', { method: 'POST', body: { ...body, current_semester: semester, chosen } })
-      setReport(data)
-      setTimeout(() => reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+      const data = await api('/api/syllabus/report', { method: 'POST', body: { ...body, current_semester: details?.semester ?? semester, chosen } })
+      setReport({ ...data, ...extra })
+      goTo(3)
     } catch (err) {
       setError(err.message)
     }
     setBusy('')
   }
 
-  async function find(e) {
+  // step 1 -> look for a saved syllabus; found: report at once, not found: the upload step
+  async function next(e) {
     e.preventDefault()
+    const d = { college: form.college.trim().replace(/\s+/g, ' '), college_id: college?.id || null,
+      department: form.department.trim().replace(/\s+/g, ' '), semester }
+    setDetails(d)
     setBusy('lookup')
     setError('')
     setReport(null)
+    setRead(null)
+    setFile(null)
     setChosen([])
     try {
-      const r = await api('/api/syllabus/lookup', { params: { college_id: pick.college_id, department: pick.department.trim(), semester } })
+      const r = await api('/api/syllabus/lookup', { params: d.college_id
+        ? { college_id: d.college_id, department: d.department, semester: d.semester }
+        : { college_name: d.college, department: d.department, semester: d.semester } })
       setLookup(r)
       setBusy('')
-      if (r.found) makeReport({ syllabus_id: r.syllabus.id })
+      if (r.found) await makeReport({ syllabus_id: r.syllabus.id })
+      else goTo(2)
     } catch (err) {
       setError(err.message)
       setBusy('')
@@ -491,31 +456,50 @@ export default function CurriculumPage() {
     if (!file) return
     setBusy('read')
     setError('')
-    setReport(null)
-    setChosen([])
     const fd = new FormData()
     fd.append('file', file)
     try {
       const r = await api('/api/syllabus/read', { method: 'POST', form: fd })
       setRead(r)
       setSubjects(r.subjects)
-      toast(`Read ${r.subjects.length} subjects. Check them, then see your report.`)
     } catch (err) {
       setError(err.message)
     }
     setBusy('')
   }
 
-  const quickReport = () => {
+  // step 2 -> save it for classmates (logged in, if ticked), then the report from the uploaded subjects
+  async function uploadedReport() {
     const clean = cleanSubjects(subjects)
     if (!clean.length) { setError('Add at least one subject.'); return }
-    makeReport({ subjects: clean, department: pick.department.trim() || read?.department || null })
+    let savedNow = false
+    if (user && save) {
+      setBusy('save')
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('department', details.department)
+      if (details.college_id || lookup?.college_id) fd.append('college_id', details.college_id || lookup.college_id)
+      else fd.append('college_name', details.college)
+      if (read?.batch) fd.append('batch', read.batch)
+      const sems = [...new Set(clean.map((s) => s.semester).filter(Boolean))]
+      if (sems.length === 1) fd.append('semester', sems[0])            // only one semester in the file
+      fd.append('subjects_json', JSON.stringify(clean))
+      try {
+        await api('/api/me/syllabi', { method: 'POST', form: fd })
+        savedNow = true
+        toast('Saved. Classmates now get this syllabus.')
+        api('/api/syllabus/colleges').then(setColleges).catch(() => {})
+      } catch (err) {
+        toast(`Not saved: ${err.message}`)
+      }
+    }
+    await makeReport({ subjects: clean, department: details.department }, { savedNow })
   }
-  const rerun = () => (report.source === 'approved' ? makeReport({ syllabus_id: report.syllabus.id }) : quickReport())
-  const showUpload = () => setTimeout(() => uploadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+
+  const rerun = () => (report.source === 'saved' ? makeReport({ syllabus_id: report.syllabus.id }) : uploadedReport())
 
   return (
-    <div className="cg cg-print-page max-w-6xl mx-auto px-4 py-8">
+    <div ref={topRef} className="cg cg-print-page max-w-6xl mx-auto px-4 py-8 scroll-mt-20">
       <div className="no-print">
         <p className="text-sm font-semibold text-sindoor">For students and faculty</p>
         <h1 className="font-display text-4xl sm:text-5xl max-w-4xl">Kolkata Tech Job Market Intelligence &amp; Skill Gap Analyser</h1>
@@ -528,94 +512,112 @@ export default function CurriculumPage() {
                     className={`px-4 py-1.5 rounded-full text-sm ${audience === v ? 'bg-dusk text-white' : 'text-gray-700'}`}>{t}</button>
           ))}
         </div>
+        <StepBar step={step} />
+      </div>
 
-        <div className="mt-6 grid lg:grid-cols-2 gap-6">
-          <form onSubmit={find} className="bg-white border border-gray-200 rounded p-5 space-y-3">
-            <h2 className="font-display text-2xl">1. Find your college's syllabus</h2>
-            <label className="block text-sm">College
-              <select required value={pick.college_id} onChange={(e) => { setPick({ ...pick, college_id: e.target.value }); setLookup(null) }} className={input}>
-                <option value="">Choose your college</option>
-                {colleges.map((c) => <option key={c.id} value={c.id}>{c.name}{c.short_name ? ` (${c.short_name})` : ''}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm">Department
-              <input required minLength={2} maxLength={120} list="cg-departments" value={pick.department}
-                     onChange={(e) => { setPick({ ...pick, department: e.target.value }); setLookup(null) }}
-                     placeholder="e.g. CSE (AI & ML)" className={input} />
-              <datalist id="cg-departments">{departments.map((d) => <option key={d} value={d} />)}</datalist>
-            </label>
-            <label className="block text-sm">{audience === 'student' ? 'Your current semester' : 'Semester (optional)'}
-              <select value={pick.semester} onChange={(e) => setPick({ ...pick, semester: e.target.value })} className={input}>
-                <option value="">{audience === 'student' ? 'Choose' : 'Whole course'}</option>
-                {SEMESTERS.map((s) => <option key={s} value={s}>Semester {s}</option>)}
-              </select>
-            </label>
-            <button disabled={busy !== ''} className="px-5 py-2.5 rounded bg-dusk text-white font-semibold disabled:opacity-50">
-              {busy === 'lookup' ? 'Looking' : 'Check my syllabus'}
-            </button>
-            {lookup && (
-              <div className={`p-3 rounded text-sm ${lookup.found ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'}`} role="status">
-                {lookup.message}
-                <button type="button" onClick={showUpload} className="block mt-1 underline font-semibold">
-                  {lookup.found ? 'Upload your syllabus for a more accurate result' : 'Upload your syllabus'}
-                </button>
-              </div>
-            )}
-          </form>
+      {step === 1 && (
+        <form onSubmit={next} className="mt-6 max-w-xl bg-white border border-gray-200 rounded p-5 space-y-3 no-print">
+          <h2 className="font-display text-2xl">Your details</h2>
+          <label className="block text-sm">College
+            <input required minLength={3} maxLength={200} list="cg-colleges" value={form.college}
+                   onChange={(e) => setForm({ ...form, college: e.target.value })}
+                   placeholder="Type your college name" className={input} />
+            <datalist id="cg-colleges">
+              {colleges.map((c) => <option key={c.id} value={c.name}>{c.short_name || ''}</option>)}
+            </datalist>
+          </label>
+          <label className="block text-sm">Department
+            <input required minLength={2} maxLength={120} list="cg-departments" value={form.department}
+                   onChange={(e) => setForm({ ...form, department: e.target.value })}
+                   placeholder="e.g. CSE (AI & ML)" className={input} />
+            <datalist id="cg-departments">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+          </label>
+          <label className="block text-sm">{audience === 'student' ? 'Your current semester' : 'Semester (optional)'}
+            <select required={audience === 'student'} value={form.semester} onChange={(e) => setForm({ ...form, semester: e.target.value })} className={input}>
+              <option value="">{audience === 'student' ? 'Choose' : 'Whole course'}</option>
+              {SEMESTERS.map((s) => <option key={s} value={s}>Semester {s}</option>)}
+            </select>
+          </label>
+          <button disabled={busy !== ''} className="px-5 py-2.5 rounded bg-dusk text-white font-semibold disabled:opacity-50">
+            {busy === 'lookup' ? 'Looking for your syllabus' : busy === 'report' ? 'Comparing with live jobs' : 'Next'}
+          </button>
+        </form>
+      )}
 
-          <form ref={uploadRef} onSubmit={readFile} className="bg-white border border-gray-200 rounded p-5 space-y-3">
-            <h2 className="font-display text-2xl">2. Or upload your syllabus</h2>
-            <p className="text-sm text-gray-600">PDF or Word, up to 10 MB. A quick check: nothing is stored unless you choose to send it.</p>
+      {step === 2 && details && (
+        <section className="mt-6 max-w-3xl bg-white border border-gray-200 rounded p-5 space-y-4 no-print">
+          <DetailsLine details={details} onChange={() => goTo(1)} />
+          <h2 className="font-display text-2xl">Upload your syllabus</h2>
+          {lookup && !lookup.found && <p className="p-3 rounded text-sm bg-amber-50 text-amber-900" role="status">{lookup.message}</p>}
+          <form onSubmit={readFile} className="space-y-3">
+            <p className="text-sm text-gray-600">PDF or Word, up to 10 MB.</p>
             <label className="flex items-center gap-3 p-4 rounded border-2 border-dashed border-gray-300 cursor-pointer hover:border-dusk">
               <Icon name="upload" className="w-6 h-6 text-gray-500" />
               <span className="text-sm">{file ? file.name : 'Choose the syllabus file'}</span>
               <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                      className="sr-only" onChange={(e) => { setFile(e.target.files[0] || null); setRead(null) }} />
             </label>
-            <button disabled={!file || busy !== ''} className="px-5 py-2.5 rounded bg-dusk text-white font-semibold disabled:opacity-50">
-              {busy === 'read' ? 'Reading the syllabus' : 'Read the syllabus'}
-            </button>
+            {!read && (
+              <button disabled={!file || busy !== ''} className="px-5 py-2.5 rounded bg-dusk text-white font-semibold disabled:opacity-50">
+                {busy === 'read' ? 'Reading the syllabus' : 'Read the syllabus'}
+              </button>
+            )}
           </form>
-        </div>
 
-        {read && (
-          <section className="mt-6 bg-white border border-gray-200 rounded p-5 space-y-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-display text-2xl">Check the subjects we read</h2>
-              <p className="text-sm text-gray-600">
-                {subjects.length} subjects{read.department ? ` \u00b7 ${read.department}` : ''}{read.batch ? ` \u00b7 batch ${read.batch}` : ''}
-                {read.method === 'ai' ? ' \u00b7 read with AI, please check carefully' : ''}
+          {read && (
+            <div className="space-y-4 border-t border-gray-200 pt-4">
+              <p className="text-sm text-gray-700">
+                We read <strong>{subjects.length} subjects</strong>{read.department ? ` \u00b7 ${read.department}` : ''}{read.batch ? ` \u00b7 batch ${read.batch}` : ''}
+                {read.method === 'ai' ? ' \u00b7 read with AI, please check them' : ''}.
               </p>
+              <details>
+                <summary className="cursor-pointer text-sm text-dusk">Check or correct the subjects (optional)</summary>
+                <div className="mt-3"><SubjectTable subjects={subjects} onChange={setSubjects} /></div>
+              </details>
+              {user ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} className="mt-1" />
+                  <span>Save it for my classmates: anyone who picks {details.college}, {details.department} gets this syllabus straight away
+                    (an admin checks it later). You can take it back any time before it is checked.</span>
+                </label>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  Your file is not stored. <Link to={loginUrl('/syllabus')} className="text-dusk underline">Log in</Link> to save it for your classmates.
+                </p>
+              )}
+              <button onClick={uploadedReport} disabled={busy !== ''} className="px-5 py-2.5 rounded bg-taxi text-ink font-semibold disabled:opacity-50">
+                {busy === 'save' ? 'Saving' : busy === 'report' ? 'Comparing with live jobs' : 'Show my report'}
+              </button>
             </div>
-            <details>
-              <summary className="cursor-pointer text-sm text-dusk">Show and correct the subject table (optional)</summary>
-              <div className="mt-3"><SubjectTable subjects={subjects} onChange={setSubjects} /></div>
-            </details>
-            <button onClick={quickReport} disabled={busy !== ''} className="px-5 py-2.5 rounded bg-taxi text-ink font-semibold disabled:opacity-50">
-              {busy === 'report' ? 'Comparing with live jobs' : 'Show my report'}
-            </button>
-          </section>
-        )}
-
-        {busy === 'report' && <p className="mt-6 text-gray-600" role="status">Comparing with live jobs. The first report can take up to a minute while the AI model wakes up.</p>}
-        {error && <p className="mt-6 p-4 rounded bg-red-50 text-sindoor text-sm" role="alert">{error}</p>}
-      </div>
-
-      {report && (
-        <div ref={reportRef} className="mt-10 scroll-mt-20">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h2 className="font-display text-3xl">Kolkata Tech Job Market Intelligence &amp; Skill Gap Analyser</h2>
-            <button onClick={() => window.print()} className="no-print px-4 py-2 rounded border border-gray-300 text-sm hover:border-dusk">
-              Print or save as PDF (for the HOD)
-            </button>
-          </div>
-          <Report data={report} audience={audience} onRerun={rerun} electiveChoices={electiveChoices} chosen={chosen} setChosen={setChosen} />
-          {report.source === 'quick' && file && (
-            <section className="mt-6 bg-white border border-gray-200 rounded p-5 no-print">
-              <ShareSyllabus file={file} subjects={subjects} colleges={colleges}
-                             defaults={{ college_id: pick.college_id, department: pick.department || read?.department || '', batch: read?.batch || '' }} />
-            </section>
           )}
+        </section>
+      )}
+
+      {busy === 'report' && <p className="mt-6 text-gray-600 no-print" role="status">Comparing with live jobs. The first report can take up to a minute while the AI model wakes up.</p>}
+      {error && <p className="mt-6 p-4 rounded bg-red-50 text-sindoor text-sm no-print" role="alert">{error}</p>}
+
+      {step === 3 && report && (
+        <div className="mt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="font-display text-3xl">Kolkata Tech Job Market Intelligence &amp; Skill Gap Analyser</h2>
+              {details && <DetailsLine details={details} onChange={() => goTo(1)} />}
+            </div>
+            <div className="flex flex-wrap gap-2 no-print">
+              {report.source === 'saved' && (
+                <button onClick={() => { setRead(null); setFile(null); goTo(2) }} className="px-4 py-2 rounded bg-dusk text-white text-sm font-semibold">
+                  Upload your syllabus for a more accurate result
+                </button>
+              )}
+              <button onClick={() => window.print()} className="px-4 py-2 rounded border border-gray-300 text-sm hover:border-dusk">
+                Print or save as PDF (for the HOD)
+              </button>
+            </div>
+          </div>
+          {report.source === 'saved' && lookup?.message && (
+            <p className="mb-4 p-3 rounded text-sm bg-green-50 text-green-800 no-print" role="status">{lookup.message}</p>
+          )}
+          <Report data={report} audience={audience} onRerun={rerun} electiveChoices={electiveChoices} chosen={chosen} setChosen={setChosen} />
         </div>
       )}
     </div>
