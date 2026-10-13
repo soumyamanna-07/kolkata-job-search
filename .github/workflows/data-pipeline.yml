@@ -1,0 +1,101 @@
+# Keeps the live site fresh. Runs on GitHub's free computers, not on the small Render server
+# (Render's free plan has too little memory for this and blocks sending email).
+#
+# Every run:
+#   1. collect jobs from every source (company boards, government pages, Adzuna, Jooble, Careerjet, Jobicy),
+#      close jobs that disappeared or are older than 60 days
+#   2. make the AI embeddings for new jobs (search, CV match, Ask AI)
+#   3. close shared / recruiter jobs whose apply link is dead
+#   4. email job alerts that are due
+# Twice a day Adzuna runs in "recent" mode (new jobs only); once a week in "full" mode.
+# Times are UTC: 03:23 and 13:23 UTC = 08:53 and 18:53 IST; Sunday 21:47 UTC = Monday 03:17 IST.
+# GitHub runs schedules only from the repository's DEFAULT branch (main).
+name: Update jobs
+
+on:
+  schedule:
+    - cron: "23 3,13 * * *"     # twice a day, recent mode
+    - cron: "47 21 * * 0"       # weekly, full mode
+  workflow_dispatch:            # "Run workflow" button on GitHub
+    inputs:
+      adzuna_mode:
+        description: "Adzuna mode"
+        type: choice
+        options: [recent, full]
+        default: recent
+      send_alerts:
+        description: "Email job alerts after updating"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:                    # never run two updates at the same time
+  group: data-pipeline
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      FASTEMBED_CACHE_PATH: /home/runner/.cache/fastembed
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            data_pipeline/requirements.txt
+            backend/requirements.txt
+
+      - name: Install libraries
+        run: pip install -r data_pipeline/requirements.txt -r backend/requirements.txt
+
+      - name: Run the pipeline unit tests
+        working-directory: data_pipeline
+        run: python -m unittest
+
+      - name: Keep the AI model between runs
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/fastembed
+          key: fastembed-all-MiniLM-L6-v2
+
+      - name: Collect jobs and make AI embeddings
+        working-directory: backend
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+          CAREERJET_API_KEY: ${{ secrets.CAREERJET_API_KEY }}
+          CAREERJET_USER_IP: ${{ secrets.CAREERJET_USER_IP }}
+          ADZUNA_MODE: ${{ github.event.schedule == '47 21 * * 0' && 'full' || inputs.adzuna_mode || 'recent' }}
+          TRIGGER: ${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}
+        run: python -m scripts.update_jobs --adzuna-mode "$ADZUNA_MODE" --trigger "$TRIGGER"
+
+      - name: Close jobs with dead apply links
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        working-directory: backend
+        run: python -m scripts.check_links
+
+      - name: Email job alerts
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.send_alerts) }}
+        working-directory: backend
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          ALERTS_SECRET: ${{ secrets.ALERTS_SECRET }}
+          APP_URL: https://kolkata-live-jobs.vercel.app
+          API_URL: https://kolkata-job-search.onrender.com
+        run: python -m scripts.send_alerts
