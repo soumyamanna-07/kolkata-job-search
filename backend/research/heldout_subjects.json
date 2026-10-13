@@ -1,331 +1,324 @@
 {
  "_comment": "Held-out test set for Stage 1.10. Fill in 'skills' for every subject by hand (names from shared/skills.json; [] = teaches no listed job skill) WITHOUT looking at the website's mapping. Then evaluate once; do not change the mapper after that.",
- "labelled_by": "project author (not labelled yet)",
+ "labelled_by": "project author (checked)",
  "from": "IT syllabus (website, https://www.makautexam.net/aicte_details/CourseStructureI/IT20.pdf)",
  "subjects": [
   {
    "name": "Physics-I",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Chemistry-I",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Mathematics - IA",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Mathematics - IB",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Basic Electrical Engineering",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Physics-I Laboratory / Chemistry-I Laboratory",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Basic Electrical Engineering Laboratory",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Engineering Graphics & Design / Workshop / Manufacturing Practices",
-   "skills": null
-  },
-  {
-   "name": ") - CSE & IT Mathematics - IB (",
-   "skills": null
-  },
-  {
-   "name": "); Workshop / Manufacturing Practices (",
-   "skills": null
-  },
-  {
-   "name": ") Semester II (First Year) Sl. No. Type of course Code Course Title Hours per week Credits Lecture Tutorial Practical Th",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Mathematics - IIA",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Mathematics - IIB",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Programming for Problem Solving",
-   "skills": null
+   "skills": [
+    "c"
+   ]
   },
   {
    "name": "English",
-   "skills": null
-  },
-  {
-   "name": "Physics-I Laboratory (Gr",
-   "skills": null
-  },
-  {
-   "name": "B) / Chemistry-I Laboratory 2 Engineering Science Course",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Language Laboratory",
-   "skills": null
-  },
-  {
-   "name": ") - CSE & IT Mathematics - II (",
-   "skills": null
-  },
-  {
-   "name": ") Physics-I (",
-   "skills": null
+   "skills": [
+    "english"
+   ]
   },
   {
    "name": "Digital Electronics",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Data Structure & Algorithms",
-   "skills": null
+   "skills": [
+    "c"
+   ]
   },
   {
    "name": "Signals & System",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Mathematics- III",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Biology",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Digital Electronics Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Data Structure & Algorithms Lab",
-   "skills": null
+   "skills": [
+    "c"
+   ]
   },
   {
    "name": "IT Workshop (Sci-Lab / R)",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Discrete Mathematics",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Computer Organization & Architecture",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Formal Language & Automata Theory",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Communication Engineering",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Economics For Engineers",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Environmental Sciences 1 - - 0 Practical 1 Professional Core Course",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Computer Organization & Architecture Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Communication Engineering Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Design Analysis & Algorithm",
-   "skills": null
+   "skills": [
+    "c"
+   ]
   },
   {
    "name": "DBMS",
-   "skills": null
+   "skills": [
+    "sql"
+   ]
   },
   {
    "name": "Operating Systems",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Object Oriented Programming with Python",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Introduction to Industrial Management (Humanities III)",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Elective-I) Human Computer Interaction",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Advanced Computer Architecture",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Computer Graphics",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Constitution of India",
-   "skills": null
-  },
-  {
-   "name": "Essence of - - - 1 Maulana Abul Kalam Azad University of Technology, West Bengal Syllabus for 4-Y",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Design Analysis & Algorithm Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "DBMS Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Operating Systems Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Object Oriented Programming with Python Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Software Engineering",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Computer Networks",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Elective-II) Compiler Design",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Distributed Systems",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Image Processing",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Elective-III) Artificial Intelligence",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Internet of Things",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Natural Language Processing",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Machine Learning",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Open Elective-I) Big Data Analytics",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Cyber Law & Ethics",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Mobile Computing",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Bioinformatics",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Robotics",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Software Engineering Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Computer Networks Lab",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Internet & Web Technology",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Elective-V) Multimedia Technology",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Information Theory and Coding",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Cyber Security",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Cloud Computing",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Open Elective-II) Operations Research",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Introduction to Philosophical Thoughts",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Soft Skill & Interpersonal Communication",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Numerical Methods",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Management 1 (Organizational Behavior)",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Information Security",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Open Elective-III) Digital Signal Processing",
-   "skills": null
+   "skills": []
   },
   {
    "name": "(Open Elective-IV) E-Commerce and ERP",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Economic Policies in India",
-   "skills": null
+   "skills": []
   },
   {
    "name": "Remote Sensing & GIS",
-   "skills": null
+   "skills": []
   }
- ]
+ ],
+ "excluded": {
+  "reason": "not a subject name: rows mis-cut from the PDF table by the syllabus reader",
+  "names": [
+   ") - CSE & IT Mathematics - IB (",
+   "); Workshop / Manufacturing Practices (",
+   ") Semester II (First Year) Sl. No. Type of course Code Course Title Hours per week Credits Lecture Tutorial Practical Th",
+   "Physics-I Laboratory (Gr",
+   "B) / Chemistry-I Laboratory 2 Engineering Science Course",
+   ") - CSE & IT Mathematics - II (",
+   ") Physics-I (",
+   "Essence of - - - 1 Maulana Abul Kalam Azad University of Technology, West Bengal Syllabus for 4-Y"
+  ]
+ }
 }
