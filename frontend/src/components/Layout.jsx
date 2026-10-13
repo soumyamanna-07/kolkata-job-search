@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import Icon from '../lib/icons'
 import { useSaved } from '../lib/saved'
 import { useTheme } from '../lib/theme'
+import LoginNudge from './LoginNudge'
 
 // for problems, wrong or fake jobs, and requests from companies to remove a listing
 const CONTACT_EMAIL = 'kolkatalivejob@gmail.com'
@@ -105,6 +106,7 @@ export default function Layout() {
       <main id="main" className="flex-1">
         <Outlet />
       </main>
+      <LoginNudge />
 
       <footer className="footer-night text-steel">
         <div className="laal-paar" />
