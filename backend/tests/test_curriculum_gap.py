@@ -59,6 +59,16 @@ class TestStatistics(unittest.TestCase):
         self.assertGreater(cg.two_proportion_p(30, 100, 18, 60), 0.5)
         self.assertEqual(cg.two_proportion_p(1, 0, 1, 10), 1.0)
 
+    def test_benjamini_hochberg(self):
+        q = cg.benjamini_hochberg({"a": 0.01, "b": 0.04, "c": 0.03, "d": 0.5})
+        self.assertAlmostEqual(q["a"], 0.04)            # 0.01 x 4 / 1
+        self.assertAlmostEqual(q["c"], 0.0533, places=4)  # min(0.03 x 4/2, 0.04 x 4/3)
+        self.assertAlmostEqual(q["b"], 0.0533, places=4)
+        self.assertAlmostEqual(q["d"], 0.5)
+        self.assertEqual(cg.benjamini_hochberg({}), {})
+        many = cg.benjamini_hochberg({f"s{i}": (0.03 if i == 0 else 0.6) for i in range(30)})
+        self.assertGreater(many["s0"], 0.05)              # one p = 0.03 among 30 tests: not a finding
+
     def test_field(self):
         self.assertEqual(cg.field_for_department("CSE (Artificial Intelligence & Machine Learning)"), "computing")
         self.assertEqual(cg.field_for_department("Information Technology"), "computing")
@@ -84,6 +94,8 @@ class TestMarket(unittest.TestCase):
         self.assertEqual(self.m.skills["sql"].trend, "steady")
         self.assertEqual(self.m.skills["python"].trend, "falling")    # 60% now vs 100% before
         self.assertLess(self.m.skills["docker"].p_value, 0.05)
+        self.assertLess(self.m.skills["docker"].q_value, 0.05)                 # survives the correction
+        self.assertGreaterEqual(self.m.skills["docker"].q_value, self.m.skills["docker"].p_value)
 
     def test_computing_report_leaves_out_other_skills(self):
         rows = [(["python", "sales"], True, day(1), 0) for _ in range(10)]
@@ -139,6 +151,15 @@ class TestReport(unittest.TestCase):
         self.assertEqual(python["coming_in_semester"], 5)
         self.assertEqual(r["summary"]["coverage_now"], 0.0)
         self.assertIn("python", [x["skill"] for x in r["learn_now"]])
+
+    def test_borderline_learn_now(self):
+        # 400 jobs: python in 60%, rust in 4% (interval low end about 2.5%: close to the 2% line)
+        rows = [(["python"] + (["rust"] if i < 16 else []) + (["docker"] if i < 120 else []), True, day(i % 30), 0)
+                for i in range(400)]
+        r = cg.build_report([{"name": "Physics-I", "semester": 1, "kind": "theory"}],
+                            map_subjects([{"name": "Physics-I"}], use_ai=False), cg.build_market(rows, "computing", now=NOW))
+        flags = {x["skill"]: x["borderline"] for x in r["learn_now"]}
+        self.assertEqual(flags, {"python": False, "docker": False, "rust": True})
 
     def test_empty_market(self):
         r = cg.build_report(SUBJECTS, self.mapped, cg.build_market([], "computing", now=NOW))

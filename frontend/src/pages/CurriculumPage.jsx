@@ -207,6 +207,7 @@ function LearnNow({ items }) {
               {x.jobs} jobs ({x.share}%) {'\u00b7'} {STATUS[x.status].label.toLowerCase()} {'\u00b7'} {TREND[x.trend]}
             </p>
             {x.coming_in_semester && <p className="text-sm text-hooghly">Comes later in semester {x.coming_in_semester}; start early.</p>}
+            {x.borderline && <p className="text-sm text-gray-600">Borderline: demand is close to the cut-off, so this may drop off the list next month.</p>}
             <Link to={`/?q=${encodeURIComponent(x.skill)}`} className="text-sm text-dusk underline no-print">See these jobs</Link>
           </div>
         </li>
@@ -331,7 +332,7 @@ function Report({ data, audience, onRerun, electiveChoices, chosen, setChosen })
         <ul className="mt-2 list-disc pl-5 space-y-1">
           <li>Each subject is linked to job skills: skills written in its name or topics, a table of common B.Tech subjects, and an AI model (sentence embeddings) for the rest.</li>
           <li>Demand = share of open {r.field === 'computing' ? 'computing ' : ''}jobs in Kolkata that ask for the skill, with a 95% Wilson confidence range.</li>
-          <li>Trend compares the last 30 days with the 60 days before (two-proportion test); it says rising or falling only when the change is clear (p &lt; 0.05).</li>
+          <li>Trend compares the last 30 days with the 60 days before (two-proportion test); it says rising or falling only when the change is clear after correcting for testing many skills at once (Benjamini-Hochberg, false discovery rate 5%).</li>
           <li>Extra classes: skills asked for together are found with association rules (Apriori: support, confidence, lift); classes are chosen to reach the most jobs per teaching hour (greedy set cover).</li>
           <li>Jobs from Adzuna are shown in search but never counted here. Updated {new Date(r.market.as_of).toLocaleString('en-IN')}.</li>
         </ul>

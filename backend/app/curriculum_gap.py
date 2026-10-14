@@ -5,11 +5,15 @@ live job market from our own database. Output: one report, ready for charts:
 
   - demand per skill: share of relevant open jobs that ask for it, with a 95% Wilson confidence
     interval (honest when job counts are small) and a trend (last 30 days vs the 60 days before,
-    two-proportion z-test = the 2x2 chi-square test; "rising"/"falling" only when p < 0.05)
+    two-proportion z-test = the 2x2 chi-square test). About 30 skills are tested at once, so the
+    p-values are corrected with Benjamini-Hochberg (false discovery rate): "rising"/"falling" only
+    when the corrected q-value is below 0.05 (Stage 1.10 showed single-test labels were fragile)
   - coverage per skill: how strongly the syllabus teaches it (0..1, from the subject links;
     a lab adds hands-on practice); elective-only skills are marked as such
   - gap score = demand share x (1 - coverage): what is asked for most and taught least
-  - "learn now": the biggest gaps the market clearly wants (confidence interval above 2%)
+  - "learn now": the biggest gaps the market clearly wants (confidence interval above 2%); a skill
+    whose interval is within one standard error of that line is marked "borderline" (in Stage 1.10
+    such skills dropped out of the list in about half of the bootstrap resamples)
   - per semester: how much of the market's demand is covered up to that semester
   - per subject: how many relevant jobs ask for what it teaches; foundation subjects listed apart
 
@@ -35,6 +39,7 @@ MIN_JOBS = 5                     # a skill needs at least this many jobs to be i
 TOP_SKILLS = 30                  # the report looks at the most-asked skills only
 MIN_TREND_JOBS = 20              # each window needs this many jobs before a trend is claimed
 LEARN_NOW_MIN_SHARE = 0.02       # lower end of the confidence interval must be above 2%
+TREND_FDR = 0.05                 # false discovery rate for the rising / falling labels
 LEARN_NOW_COUNT = 8
 COVERED = 0.6                    # coverage at or above this = the syllabus teaches it properly
 LAB_BONUS = 0.1                  # hands-on practice in a lab adds a little coverage
@@ -75,6 +80,17 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return max(0.0, centre - half), min(1.0, centre + half)
 
 
+def benjamini_hochberg(p_values: dict[str, float]) -> dict[str, float]:
+    """q-values (Benjamini-Hochberg adjusted p-values) for many tests run together."""
+    items = sorted(p_values.items(), key=lambda kv: kv[1])
+    m, q, running = len(items), {}, 1.0
+    for rank in range(m, 0, -1):
+        key, p = items[rank - 1]
+        running = min(running, p * m / rank)
+        q[key] = min(1.0, running)
+    return q
+
+
 def two_proportion_p(k1: int, n1: int, k2: int, n2: int) -> float:
     """Two-sided p-value: is k1/n1 different from k2/n2? (z-test; z squared is the 2x2 chi-square)"""
     if n1 <= 0 or n2 <= 0:
@@ -100,6 +116,7 @@ class SkillDemand:
     older: int = 0               # ... posted on day 31..90
     trend: str = "unknown"       # rising / falling / steady / unknown
     p_value: Optional[float] = None
+    q_value: Optional[float] = None            # p-value corrected for testing many skills at once
 
 
 @dataclass
@@ -156,11 +173,15 @@ def build_market(rows: Sequence[tuple], field_name: str, now: Optional[datetime]
                         recent.get(s, 0), older.get(s, 0))
         if len(recent_sets) >= MIN_TREND_JOBS and len(older_sets) >= MIN_TREND_JOBS:
             d.p_value = two_proportion_p(d.recent, len(recent_sets), d.older, len(older_sets))
-            if d.p_value < 0.05:
-                d.trend = "rising" if d.recent / len(recent_sets) > d.older / len(older_sets) else "falling"
-            else:
-                d.trend = "steady"
         demand[s] = d
+    q_values = benjamini_hochberg({s: d.p_value for s, d in demand.items() if d.p_value is not None})
+    for s, q in q_values.items():
+        d = demand[s]
+        d.q_value = q
+        if q < TREND_FDR:
+            d.trend = "rising" if d.recent / len(recent_sets) > d.older / len(older_sets) else "falling"
+        else:
+            d.trend = "steady"
     return Market(field_name, total, len(fresher_sets), len(recent_sets), len(older_sets), demand,
                   open_sets, now.isoformat(timespec="minutes"))
 
@@ -241,6 +262,7 @@ def build_report(subjects: Sequence[dict], mapped: Sequence[SubjectSkills], mark
             "skill": s, "jobs": d.jobs, "fresher_jobs": d.fresher_jobs, "share": _pct(d.share),
             "ci": [_pct(d.ci_low), _pct(d.ci_high)], "trend": d.trend,
             "p_value": None if d.p_value is None else round(d.p_value, 4),
+            "q_value": None if d.q_value is None else round(d.q_value, 4),
             "coverage": round(cov_all, 2), "coverage_now": round(cov_now, 2), "status": status,
             "coming_in_semester": min(later) if later and cov_now < COVERED else None,
             "gap_score": round(d.share * (1 - cov_now), 4),
@@ -250,6 +272,13 @@ def build_report(subjects: Sequence[dict], mapped: Sequence[SubjectSkills], mark
 
     learn_now = sorted((x for x in skills if x["coverage_now"] < COVERED and x["ci"][0] >= 100 * LEARN_NOW_MIN_SHARE),
                        key=lambda x: (-x["gap_score"], x["skill"]))[:LEARN_NOW_COUNT]
+
+    def borderline(skill: str) -> bool:
+        """The interval's lower end is within one standard error of the 2% line: a slightly different
+        sample of jobs could drop this skill from the list."""
+        d = market.skills[skill]
+        se = math.sqrt(d.share * (1 - d.share) / market.jobs) if market.jobs else 0.0
+        return d.ci_low - LEARN_NOW_MIN_SHARE < se
 
     total_share = sum(d.share for d in market.skills.values()) or 1.0
 
@@ -286,7 +315,8 @@ def build_report(subjects: Sequence[dict], mapped: Sequence[SubjectSkills], mark
                     "subjects": len(subjects), "foundation_subjects": len(foundation)},
         "skills": skills,
         "learn_now": [{"skill": x["skill"], "share": x["share"], "jobs": x["jobs"], "status": x["status"],
-                       "trend": x["trend"], "coming_in_semester": x["coming_in_semester"]} for x in learn_now],
+                       "trend": x["trend"], "coming_in_semester": x["coming_in_semester"],
+                       "borderline": borderline(x["skill"])} for x in learn_now],
         "semesters": by_semester,
         "subjects": sorted(per_subject, key=lambda x: (-x["jobs"], x["semester"] or 0)),
         "foundation_subjects": foundation,
